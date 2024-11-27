@@ -1,0 +1,148 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>360° Video Viewer</title>
+    <style>
+        body { margin: 0; }
+    </style>
+    <link rel="stylesheet" href="{% static 'map/css/style.css' %}">
+    <!-- bootstrap style -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" 
+            rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" 
+            crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" 
+            integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" 
+            crossorigin="anonymous">
+    </script>
+    <!-- bootstrap icon -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+</head>
+<body>
+    <div class="container-md">
+        <h1 class="display-6">road view demo</h1>
+        <div class="row">
+            <button id="videoUpload" type="submit" class="btn btn-primary btn-lg col-2" data-bs-toggle="modal" data-bs-target="#videoUploadModal">
+                Upload Video
+            </button> &nbsp &nbsp &nbsp
+            <button class="btn btn-primary btn-lg col-2" data-bs-toggle="modal" data-bs-target="#checkModal">
+                Check
+            </button>
+        </div>
+        
+        <!-- <canvas class="webgl"></canvas> -->
+
+
+        <!-- video upload modal -->
+        <div class="modal fade" id="videoUploadModal" tabindex="-1" aria-labelledby="videoUpload" data-bs-keyboard="false" data-bs-backdrop="static">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="videoUpload">panorama video upload</h5>
+                        <button type="button" class="btn btn-close btn-primary" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="d-flex justify-content-center align-items-center mb-3 mt-3">
+                                <div class="drop-box" id="dropbox" style="width: 80%; height: 200px; border: 3px dashed gray; border-radius:30px ;text-align: center;">
+                                    <div class="d-flex justify-content-center align-items-center" style="height: 100%;">
+                                        <p style="font-size: 24px; color: gray;">
+                                            <i class="bi bi-filetype-mp4" style="font-size: 3rem;"></i><br>
+                                            Drag & Drop to Upload File
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <form id="videoForm" data-url="{% url 'videoupload' %}" method="post" enctype="multipart/form-data">
+                                {% csrf_token%}
+                                <!-- folder select -->
+                                <div class="row">
+                                    <div class="col-12 d-flex justify-content-center align-items-center">
+                                        <input type="file" name="folder" id="folder" accept=".mp4" style="display: none;" directory="" webkitdirectory="" mozdirectory="">
+                                        <label for="folder" class="btn btn-outline-primary mb-3">video select</label>
+                                    </div>
+                                    <!-- files list -->
+                                    <div id="fileList" class="mb-3 col-12 d-flex justify-content-center align-items-center"></div>
+
+                                    <div class="modal-footer">
+                                        <button id="videoSubmit" type="submit" class="btn btn-primary">submit</button>
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">close</button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- img pre-view model -->
+    <div class="modal fade" id="checkModal" tabindex="-1" aria-labelledby="check" aria-hidden="true">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="videoUpload">check view</h5>
+                    <button type="button" class="btn btn-close btn-primary" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="imgbox" class="row">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">닫기</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{% static 'map/js/upload.js' %}"></script>
+    <script>
+        const imgContainer = document.getElementById('imgbox');
+        imgContainer.innerHTML = '';
+
+        datas = {{ data|safe }};
+        if (!datas || datas.length === 0) {
+            console.log('No data');
+            imgContainer.innerHTML = '<img src="/static/img/questionmark.png"/>';
+            
+        } else {
+            for (let i=0; i<datas.length; i++) {
+                const data = datas[i];
+                const imgDiv = document.createElement('div');
+                imgDiv.classList.add('col-4','mb-3', 'rounded');
+
+                const anchor = document.createElement('a');
+                anchor.href = `/view/${data.video_id}`;
+                anchor.target = "_blank";
+
+                const img = document.createElement('img');
+                img.classList.add('mb-3');
+                img.src = data.first_image;
+                img.style.width ='100%';
+                img.style.height ='100%';
+                anchor.appendChild(img);
+                imgDiv.appendChild(anchor);
+                imgContainer.appendChild(imgDiv);
+            }
+        }
+    </script>
+    <!-- <script type="module" src="{% static 'map/js/view.js' %}"></script> -->
+
+    <!--#######################################-->
+    {%comment%}<canvas class="webgl"></canvas>
+
+
+    <!-- video test -->
+    <video id="video" loop muted crossorigin="anonymous" playsinline style="display: none;">
+        <source src="{% static 'map/video/temp_video_1730710601385.mp4' %}">
+    </video>
+
+    <script type="module" src="{% static 'map/js/view.js' %}"></script>{%endcomment%}
+    <!--#######################################-->
+
+</body>
+</html>
