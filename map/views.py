@@ -8,6 +8,8 @@ import os
 import aiofiles
 import asyncio
 import cv2
+import numpy as np
+
 # Create your views here.
 
 def index(request):
@@ -45,22 +47,129 @@ async def write_file_async(file_path, file_chunk, offset):
     async with aiofiles.open(file_path, mode) as f:
         await f.write(file_chunk.read())
 
+def panorama_to_cubemap(image, cube_width, cube_height):
+    """
+        from panorama(equirectangular) to cube image
+
+        args:
+            image: panorama image's numpy array
+            cube_width, cube_height: each cube image size
+        return:
+            6 cube mapping dictionary
+    """
+    # cube direction
+    # left,right,up,down,front,back
+
+    directions = {
+        "r": np.array([1, 0, 0]), # X-
+        "l": np.array([-1, 0, 0]),  # X+
+        "u": np.array([0, 1, 0]),  # Y+
+        "d": np.array([0, -1, 0]), # Y-
+        "f": np.array([0, 0, 1]),  # Z+
+        "b": np.array([0, 0, -1]), # Z-
+    }
+
+    h, w = image.shape[:2]
+    cubemap_faces = []
+    if not isinstance(image, np.ndarray) or h == 0 or w == 0:
+        raise ValueError("Input image must be a valid numpy array with non-zero dimensions")
+
+    for face_name, direction in directions.items():
+        face = render_cubemap_face(image, w, h, cube_width, cube_height, direction)
+        cubemap_faces.append(face)
+    
+    # stack image in one line: left, right, up, down, left, right
+    stack_image = np.hstack(cubemap_faces)
+    
+    return stack_image
+
+def render_cubemap_face(image, width, height, cube_width, cube_height, direction):
+    """
+        each cube
+
+        args:
+            image: input panorama image(`numpy array`)
+            width: panorama image width
+            height: panorama image height
+            cube_width, cube_height: cube image size
+            direction: crop image direction
+        return:
+            cube images
+    """
+    # 立方体面采样坐标
+    u, v = np.meshgrid(
+        np.linspace(-1, 1, cube_width),
+        np.linspace(-1, 1, cube_height)
+    )
+    d = np.ones_like(u)
+
+    if direction[0] == 1:  # Left (X-)
+        x, y, z = u, -v, d
+    elif direction[0] == -1:  # Right (X+)
+        x, y, z = -u, -v, -d
+    elif direction[1] == 1:  # Up (Y+)
+        x, y, z = u, d, v
+    elif direction[1] == -1:  # Down (Y-)
+        x, y, z = u, -d, -v
+    elif direction[2] == 1:  # Front (Z+)
+        x, y, z = -d, -v, u
+    elif direction[2] == -1:  # Back (Z-)
+        x, y, z = d, -v, -u
+    else:
+        raise ValueError("Invalid direction")
+
+    # 将方向转换为 equirectangular 图的 UV 坐标
+    lon = np.arctan2(x, z)
+    lat = np.arcsin(y / np.sqrt(x**2 + y**2 + z**2))
+
+    u = (lon / (2 * np.pi) + 0.5) * width
+    v = (0.5 - lat / np.pi) * height
+
+    # 插值采样
+    face = cv2.remap(
+        image,
+        u.astype(np.float32),
+        v.astype(np.float32),
+        interpolation=cv2.INTER_LINEAR,
+        borderMode=cv2.BORDER_WRAP
+    )
+    if direction[1] == 1:  # Up
+        face = cv2.rotate(face, cv2.ROTATE_90_COUNTERCLOCKWISE)  # 顺时针旋转 90 度
+    elif direction[1] == -1:  # Down
+        face = cv2.rotate(face, cv2.ROTATE_90_CLOCKWISE)
+    return face
+
+
 def crop_frame_to_img(video_obj, interval=3):
+    '''
+        get frame from video, crop 6 images for a cube from each frame image.
+        
+        args:
+            video_obj: video file from db
+            interval: frame step
+        return:
+            status code:
+                `200: success,
+                406: failed`
+    '''
+    # read video file
     video_path = video_obj.video.path
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         print('can not open video file')
         return 406
     
+    # get video frame info
     fps = cap.get(cv2.CAP_PROP_FPS)
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     duration = total_frames / fps
     second = 0
 
-    
+    # make img path: '/media/img/{video_id}'
     save_path = os.path.join(settings.MEDIA_ROOT, "img", str(video_obj.id))
     os.makedirs(save_path, exist_ok=True)
     
+    # cut video frame image per 3s
     while second < duration:
         frame_index = int(fps * second)
         cap.set(cv2.CAP_PROP_POS_FRAMES, frame_index)
@@ -69,19 +178,26 @@ def crop_frame_to_img(video_obj, interval=3):
         if not ret:
             print(f'Frame at {second} seconds could not be read')
             break
+        
+        # crop panorama to "front", "back", "left", "right", "up", "down",  6 images
+        height, width, _ = frame.shape
+        if width / height != 2:
+            raise ValueError(f"frame size is:{width}:{height}, not 2:1")
+        
+        # calc crop img size
+        cube_width = width // 4
+        cube_height = height // 2
+        cubemap_faces = panorama_to_cubemap(frame, cube_width, cube_height)
 
         frame_filename = f"frame_{second:04d}.jpg"
         frame_path = os.path.join(save_path, frame_filename)
-        cv2.imwrite(frame_path, frame)
+        cv2.imwrite(frame_path, cubemap_faces)
 
         PanoramaImage.objects.create(
             image=os.path.relpath(frame_path, settings.MEDIA_ROOT),
             video_id=video_obj
         )
-        # save_path = os.path.join("media/img", os.path.basename(video_path).split('.mp4')[0])
-        # os.makedirs(save_path, exist_ok=True)
-        # cv2.imwrite(os.path.join(save_path, f"frame_{second:04d}.png"), frame)
-        # print(f"save {os.path.join(save_path, f'frame_{second:04d}.png')}")
+
         second += interval
 
     cap.release()
@@ -102,7 +218,7 @@ def videoupload(request):
             return JsonResponse({'error': 'File type Error'}, status=415)
 
 
-        temp_file_path = os.path.join('media', "temp/")
+        temp_file_path = os.path.join(settings.MEDIA_ROOT, "temp/")
         os.makedirs(temp_file_path, exist_ok=True)
         temp_file = os.path.join(temp_file_path, filename)
 
@@ -117,6 +233,19 @@ def videoupload(request):
                     name=os.path.basename(temp_file),
                     video=os.path.relpath(temp_file, settings.MEDIA_ROOT),
                 )
+
+                #  make video path: '/media/video/{video_id}'
+                video_folder = os.path.join(settings.MEDIA_ROOT, 'video', str(video_obj.id)) 
+                os.makedirs(video_folder,exist_ok=True)
+
+                # clean && move temp file to '/media/video/{video_id}'
+                source_file = os.path.join(video_folder, filename)
+                os.rename(temp_file, source_file)
+                
+                # update video model
+                video_obj.video = os.path.relpath(source_file, settings.MEDIA_ROOT)
+                video_obj.save()
+
                 status = crop_frame_to_img(video_obj)
                 if status == 200:
                     return JsonResponse({'message': "file upload success"}, status=200)

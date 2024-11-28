@@ -18,12 +18,12 @@ class PanoramaVideo(models.Model):
     
 class PanoramaImage(models.Model):
     id = models.AutoField(primary_key=True)
-    image = models.ImageField(max_length=256, upload_to='img/')
+    image = models.ImageField(max_length=256, upload_to='img/', null=True, blank=True)
     video_id = models.ForeignKey(PanoramaVideo, on_delete=models.CASCADE, null=False, db_column='video_id')
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'panorama_image'
 
     def __str__(self) -> str:
-        return f'{self.id} - from video {self.video_id.id} - {self.video_id.name}'
+        return f'{self.id} - video: {self.video_id.id} - {self.video_id.name}'

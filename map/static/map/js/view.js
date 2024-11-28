@@ -3,156 +3,194 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 import {Tween, Group, Easing} from "@tweenjs/tween.js";
 
-let currentIndex = 0;
-let isAnimating = false;
-let isDragging = false;
+let camera,controls;
+let renderer;
+let labelRenderer;
+let scene;
+let box;
+let index = 0;
 const tweenGroup = new Group();
 
-const sizes = {
-    width: window.innerWidth,
-    height: window.innerHeight,
-};
+init();
 
-const scene = new THREE.Scene();
-const canvas = document.querySelector('canvas.webgl');
-const renderer = new THREE.WebGLRenderer({
-    canvas,
-    antialias: true,
-});
-renderer.setSize(sizes.width, sizes.height);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+function init() {
+    const container = document.getElementById('container');
 
-const labelRenderer = new CSS2DRenderer();
-labelRenderer.setSize(sizes.width, sizes.height);
-labelRenderer.domElement.style.position = 'absolute';
-labelRenderer.domElement.style.top = '0';
-labelRenderer.domElement.style.pointerEvents = 'none';
-document.body.appendChild(labelRenderer.domElement);
+    renderer = new THREE.WebGLRenderer();
+    renderer.setPixelRatio( window.devicePixelRatio );
+    renderer.setSize( window.innerWidth, window.innerHeight );
+    renderer.setAnimationLoop( animate );
+    container.appendChild( renderer.domElement );
 
+    labelRenderer = new CSS2DRenderer();
+    labelRenderer.setSize(window.innerWidth, window.innerHeight);
+    labelRenderer.domElement.style.position = 'absolute';
+    labelRenderer.domElement.style.top = '0';
+    labelRenderer.domElement.style.pointerEvents = 'none';
+    document.body.appendChild(labelRenderer.domElement);
 
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.position.set(0, 0, 0.1);
+    scene = new THREE.Scene();
 
-const geometry = new THREE.SphereGeometry(32,512,512);
-geometry.scale(1, 1, -1); // 反转球体
+    camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.z = 0.01;
 
-let material = new THREE.MeshBasicMaterial();
-const sphere = new THREE.Mesh(geometry, material);
-scene.add(sphere);
+    controls = new OrbitControls( camera, renderer.domElement );
+    controls.enableZoom = true;
+    controls.enablePan = false;
+    controls.enableDamping = true;
 
-// 初始化控制器
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(0, 0, -0.1);
-controls.enableDamping = true;
-controls.enablePan = false;
-controls.enableRotate = true;
-controls.enableZoom = true;
+    loadImage(index);
+    
+    updateButton();
 
+    window.addEventListener( 'resize', onWindowResize );
 
-function loadImage(index) {   
-    const textureLoader = new THREE.TextureLoader(); 
-    textureLoader.load(
-        new URL(images[index], import.meta.url).href,
-        (texture) => {
-            console.log(`Image loaded successfully: ${images[index]}`);
-            material.map = texture;
-            material.needsUpdate = true;
-            console.log(`Image loaded: ${images[index]}`);
-        },
-        undefined,
-        (error) => {
-            console.error(`Failed to load texture: ${images[index]}`, error);
-        }
-    );
-    // material.map = textureLoader.load(new URL(images[index], import.meta.url).href);
-    // material.needsUpdate = true;
 }
 
-// button
+function loadImage(index) {
+    const textures = getTexturesFromAtlasFile( images[index], 6 );
+    
+
+    const materials = textures.map(texture => new THREE.MeshBasicMaterial({ map: texture }));
+
+    if (box) {
+        box.material = materials; // 替换材质
+    } else {
+        // 初始化 Box
+        box = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), materials);
+        box.geometry.scale(1, 1, -1); // 翻转以从内部观察
+        scene.add(box);
+    }
+
+}
+
+function getTexturesFromAtlasFile( imgURL, num ) {
+    const textures = [];
+    
+    for (let i=0; i<num; i++) {
+        textures[ i ] = new THREE.Texture();
+    }
+
+    new THREE.ImageLoader()
+        .load( imgURL, (image) => {
+            
+            let canvas, context;
+            const cropWidth = image.height;
+
+            for (let i=0; i<textures.length; i++) {
+
+                canvas = document.createElement( 'canvas' );
+                context = canvas.getContext( '2d' );
+                canvas.height = cropWidth;
+                canvas.width = cropWidth;
+                context.drawImage( 
+                    image, 
+                    cropWidth*i, 0, cropWidth, cropWidth, 
+                    0, 0, cropWidth, cropWidth 
+                );
+                textures[ i ].colorSpace = THREE.SRGBColorSpace;
+                textures[ i ].image = canvas;
+                textures[ i ].needsUpdate = true;
+
+            }
+        });
+    
+    return textures;
+}
+
 function createButton(text, position, onClick) {
     const button = document.createElement('button');
     button.textContent = text;
-    button.className = 'label';
+    button.style.position = 'absolute';
+    // button.style.top = '50%';
+    button.style.transform = 'translateY(-50%)';
     button.style.padding = '10px';
-    button.style.borderRadius = '5px';
     button.style.cursor = 'pointer';
-    button.style.backgroundColor = 'rgba(0,0,0,0.7)';
+    button.style.zIndex = 10;
+    button.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
     button.style.color = 'white';
     button.style.pointerEvents = 'auto';
 
-
-    button.addEventListener('click', () => {
-        console.log(`click button: ${text}`);
-        onClick();
-    });
-
+    button.addEventListener('click', onClick);
+    
     const label = new CSS2DObject(button);
     label.position.copy(position);
-    sphere.add(label);
+    box.add(label);
+    
     return label;
 }
 
-function updateButtons() {
+function updateButton() {
     // 清除现有按钮
-    sphere.children.forEach(child => {
+    box.children.forEach(child => {
         if (child instanceof CSS2DObject) {
-            sphere.remove(child);
+            box.remove(child);
         }
     });
 
-    if (currentIndex > 0) {
-        createButton('Previous', new THREE.Vector3(0, -5, 10), () => transitionToImage(currentIndex - 1, -1));
+    if (index > 0) {
+        createButton('Previous', new THREE.Vector3(0, -0.1, 1), () => transitionToImage(index - 1, -0.1));
     }
-    if (currentIndex < images.length -1) {
-        createButton('Next', new THREE.Vector3(0, -5, -10), () => transitionToImage(currentIndex + 1, 1));
+
+    if (index < images.length - 1) {
+        createButton('Next', new THREE.Vector3(0, -0.1, -1), () => transitionToImage(index + 1, 0.1));
     }
+
 }
 
-
-function transitionToImage(index, target_z) {
-    if (isAnimating || index < 0 || index >= images.length) {
-        console.log('Transition aborted: Invalid state or index');
-        return;
+function transitionToImage(targetIndex, target_z) {
+    if (targetIndex < 0 || targetIndex >= images.length || targetIndex === index) {
+        return; // 无效索引
     }
-    console.log(`Transitioning to image: ${index}`); 
-    currentIndex = index; // 确保在动画开始时更新索引
-    isAnimating = true;
 
-    const currentPosition = { z: camera.position.z, fov: camera.fov }; // 当前摄像机位置和视角
-    const targetPosition = { z: camera.position.z + target_z, fov: 60 }; // 目标位置和视角（模拟拉近）
-    const returnPosition = { z: camera.position.z, fov: 75 }; // 返回位置和视角
+    // 保存当前相机状态
+    const currentCameraState = {
+        position: camera.position.clone(),
+        quaternion: camera.quaternion.clone(),
+        fov: camera.fov
+    };
 
-    const moveToTarget = new Tween(currentPosition, tweenGroup)
-        .to(targetPosition, 30) // 动画时长为 1000ms
+    const currentPosition = { z: camera.position.z };
+    const targetPosition = { z: camera.position.z + target_z };
+
+    // 动画：将摄像机移动到目标位置
+    new Tween(currentPosition, tweenGroup)
+        .to(targetPosition, 500) // 动画时间 500ms
         .easing(Easing.Quadratic.Out)
         .onUpdate(() => {
             camera.position.z = currentPosition.z;
-            camera.fov = currentPosition.fov;
+            // camera.fov = 50;
             camera.updateProjectionMatrix();
         })
         .onComplete(() => {
-            // 动画完成后切换图片
+            // 切换图片
+            index = targetIndex; // 更新当前索引
             loadImage(index);
-            isAnimating = false;
-            currentIndex = index; // 更新索引
-            updateButtons(); // 更新按钮
+            updateButton(); // 更新按钮状态
+            controls.update();
+            // 恢复相机状态
+            camera.position.copy(currentCameraState.position);
+            camera.quaternion.copy(currentCameraState.quaternion);
+            camera.fov = currentCameraState.fov;
+            camera.updateProjectionMatrix();
         })
         .start();
 }
 
+function onWindowResize() {
 
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    labelRenderer.setSize(window.innerWidth, window.innerHeight);
 
-loadImage(currentIndex);
-updateButtons();
-
-
-
-function renderLoop() {
-    controls.update();
-    tweenGroup.update();
-    renderer.render(scene, camera);
-    labelRenderer.render(scene, camera);
-    requestAnimationFrame(renderLoop);
 }
 
-renderLoop();
+function animate() {
+
+    controls.update(); // required when damping is enabled
+    tweenGroup.update();
+    renderer.render( scene, camera );
+    labelRenderer.render(scene, camera);
+
+}

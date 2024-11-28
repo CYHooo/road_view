@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>360° Video Viewer</title>
+    <title>Viewer DEMO</title>
     <style>
         body { margin: 0; }
     </style>
@@ -35,7 +35,7 @@
     <script>
         const images = {{ frames|safe }};
     </script>
-    <canvas class="webgl"></canvas>
+    <div id="container"></div>
     <script type="module" src="{% static 'map/js/view.js' %}"></script>
 </body>
 </html>

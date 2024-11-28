@@ -107,7 +107,7 @@
         datas = {{ data|safe }};
         if (!datas || datas.length === 0) {
             console.log('No data');
-            imgContainer.innerHTML = '<img src="/static/img/questionmark.png"/>';
+            imgContainer.innerHTML = "<img src='/static/map/img/questionmark.png' style='width:300px;'/>";
             
         } else {
             for (let i=0; i<datas.length; i++) {
