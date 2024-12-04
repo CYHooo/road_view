@@ -31,9 +31,6 @@
                 Check
             </button>
         </div>
-        
-        <!-- <canvas class="webgl"></canvas> -->
-
 
         <!-- video upload modal -->
         <div class="modal fade" id="videoUploadModal" tabindex="-1" aria-labelledby="videoUpload" data-bs-keyboard="false" data-bs-backdrop="static">
@@ -61,8 +58,10 @@
                                 <!-- folder select -->
                                 <div class="row">
                                     <div class="col-12 d-flex justify-content-center align-items-center">
-                                        <input type="file" name="folder" id="folder" accept=".mp4" style="display: none;" directory="" webkitdirectory="" mozdirectory="">
-                                        <label for="folder" class="btn btn-outline-primary mb-3">video select</label>
+                                        <input type="file" name="files" id="files" style="display: none;" accept=".mp4" multiple>
+                                        <label for="files" class="btn btn-outline-primary mb-3 me-3">Upload Files</label>
+                                        <input type="file" name="folder" id="folder" style="display: none;" webkitdirectory="">
+                                        <label for="folder" class="btn btn-outline-primary mb-3 ms-3">Upload Folder</label>
                                     </div>
                                     <!-- files list -->
                                     <div id="fileList" class="mb-3 col-12 d-flex justify-content-center align-items-center"></div>
@@ -107,20 +106,25 @@
         datas = {{ data|safe }};
         if (!datas || datas.length === 0) {
             console.log('No data');
-            imgContainer.innerHTML = "<img src='/static/map/img/questionmark.png' style='width:300px;'/>";
+            imgContainer.innerHTML = `
+                <div class="text-center">
+                    <img src='/static/map/img/questionmark.png' style='width:300px;' class="rounded"/>
+                    <p class="text-secondary"><strong>Please Upload 360 Panorama Video First</strong></p>
+                </div>
+            `;
             
         } else {
             for (let i=0; i<datas.length; i++) {
                 const data = datas[i];
                 const imgDiv = document.createElement('div');
-                imgDiv.classList.add('col-4','mb-3', 'rounded');
+                imgDiv.classList.add('col-2','mb-3');
 
                 const anchor = document.createElement('a');
                 anchor.href = `/view/${data.video_id}`;
                 anchor.target = "_blank";
 
                 const img = document.createElement('img');
-                img.classList.add('mb-3');
+                img.classList.add('mb-3','rounded-3');
                 img.src = data.first_image;
                 img.style.width ='100%';
                 img.style.height ='100%';

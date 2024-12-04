@@ -27,3 +27,18 @@ class PanoramaImage(models.Model):
 
     def __str__(self) -> str:
         return f'{self.id} - video: {self.video_id.id} - {self.video_id.name}'
+    
+class TypeInfo(models.Model):
+    id = models.AutoField(primary_key=True)
+    text = models.CharField(max_length=256)
+    x = models.FloatField()
+    y = models.FloatField()
+    z = models.FloatField()
+    image_id = models.ForeignKey(PanoramaImage, on_delete=models.CASCADE, null=False, db_column='image_id')
+
+    class Meta:
+        managed = False
+        db_table = 'type_info'
+
+    def __str__(self) -> str:
+        return f'{self.id} - Type: {self.text} - Image: {self.image_id.id}'

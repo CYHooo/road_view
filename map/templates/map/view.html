@@ -7,6 +7,40 @@
     <title>Viewer DEMO</title>
     <style>
         body { margin: 0; }
+        #blocker {
+            color: white;
+            display: none;
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            z-index: 15;
+        }
+
+        #info {
+            width: 100%;
+            height: 100%;
+
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+
+            color: white;
+            text-align: left;
+            font-size: 24px;
+            cursor: pointer;
+        }
+        #crosshair {
+            display: none; 
+            position: absolute; 
+            top: 50%; 
+            left: 50%; 
+            transform: translate(-50%, -50%); 
+            font-size: 36px;
+            color: red;
+            z-index: 9999;
+        }
     </style>
     <link rel="stylesheet" href="{% static 'map/css/style.css' %}">
     <!-- bootstrap style -->
@@ -32,9 +66,30 @@
     </script>
 </head>
 <body>
+    <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+
     <script>
-        const images = {{ frames|safe }};
+        const images = {{ images|safe }};  
     </script>
+
+    <div id="blocker">
+        <div id="info">
+            <p style="font-size:42px">
+                Click to Start<br>
+            </p>
+            <p>
+                View: Mouse<br>
+                Check: Click<br>
+                ESC: Cancel
+            </p>
+        </div>
+    </div>
+
+    <div id="crosshair">
+        <!-- <i class="bi bi-crosshair"></i> -->
+        <i class="bi bi-plus-lg"></i>
+
+    </div>
     <div id="container"></div>
     <script type="module" src="{% static 'map/js/view.js' %}"></script>
 </body>

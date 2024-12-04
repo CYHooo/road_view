@@ -52,10 +52,32 @@ dropbox.addEventListener('dragleave', function (e) {
 
 // 文件被放下时处理文件
 dropbox.addEventListener('drop', function (e) {
-    // e.stopPropagation(); // 阻止冒泡
     e.preventDefault();
-    const files = e.dataTransfer.files;
-    handleFileInput(e, files); // 处理文件
+    e.stopPropagation(); // 阻止冒泡
+    const items = e.dataTransfer.items;
+    const promises = [];
+
+    if (items) {
+        // 使用 DataTransferItemList 接口
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].kind === 'file') {
+                const entry = items[i].webkitGetAsEntry();
+                if (entry) {
+                    promises.push(readAllEntries(entry));
+                }
+            }
+        }
+
+        Promise.all(promises).then(results => {
+            const files = results.flat(Infinity);
+            if (files.length > 0) {
+                updateFileList(files);
+            } else {
+                alert('未找到任何 .mp4 文件');
+            }
+        });
+    }
+    
     this.style.background = '';
     this.style.border = '3px dashed gray';
     this.style.borderRadius = "30px";
@@ -67,9 +89,48 @@ dropbox.addEventListener('drop', function (e) {
                       </div>`;
 });
 
-// button upload
+function readAllEntries(entry) {
+    return new Promise((resolve) => {
+        if (entry.isFile) {
+            entry.file(file => {
+                if (file.name.toLowerCase().endsWith('.mp4')) {
+                    resolve([file]);
+                } else {
+                    resolve([]);
+                }
+            });
+        } else if (entry.isDirectory) {
+            const dirReader = entry.createReader();
+            const entries = [];
+
+            const readEntries = () => {
+                dirReader.readEntries(results => {
+                    if (!results.length) {
+                        // 所有子条目读取完成
+                        const promises = entries.map(readAllEntries);
+                        Promise.all(promises).then(files => {
+                            resolve(files.flat());
+                        });
+                    } else {
+                        entries.push(...results);
+                        readEntries();
+                    }
+                });
+            };
+
+            readEntries();
+        }
+    });
+}
+
+
+// button upload files
+document.getElementById('files').addEventListener('change', function (e) {
+    handleFileSelection(e.target.files);
+});
+// button upload folder
 document.getElementById('folder').addEventListener('change', function (e) {
-    handleFileInput(e, e.target.files);
+    handleFolderSelection(e.target.files);
 });
 
 // init file info list
@@ -84,6 +145,34 @@ videoUploadModal.addEventListener('hidden.bs.modal', function () {
         fileInput.value = '';
     }
 });
+
+// button files upload
+function handleFileSelection(files) {
+    if (files.length > 0) {
+        updateFileList(files);
+    } else {
+        alert('No file Selected, Please Check Again.');
+    }
+}
+
+// button folder upload
+function handleFolderSelection(files) {
+    const mp4Files = [];
+
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (file.name.toLowerCase().endsWith('.mp4')) {
+            mp4Files.push(file);
+        }
+    }
+
+    if (mp4Files.length > 0) {
+        updateFileList(mp4Files);
+    } else {
+        alert('未找到任何 .mp4 文件，请选择包含 .mp4 文件的文件夹。');
+    }
+}
+
 
 // 创建固定表头的表格
 function createFixedHeaderTable(files) {
@@ -142,10 +231,10 @@ function createFixedHeaderTable(files) {
         row.innerHTML = `
             <td style="width: 5%">${index + 1}</td>
             <td style="width: 45%">
-                <div class="file-icon">
+                <div class="file-icon text-primary">
                     <i class="bi bi-filetype-mp4"></i>
+                    ${file.name}
                 </div>
-                ${file.name}
             </td>
             <td style="width: 35%">
                 <div class="progress">
@@ -183,16 +272,10 @@ function updateFileList(files) {
     files = Array.from(files);
 
     if (files.length > 0) {
-        // check file type
-        const checkFilesMP4 = files.every(file => file.type === 'video/mp4' || file.name.toLowerCase().endsWith('.mp4'));
-        if (!checkFilesMP4) {
-            alert('Please upload only MP4 files.');
-            return;
-        }
-
+        // 已经只包含 .mp4 文件，不再需要检查
         fileListContainer.appendChild(createFixedHeaderTable(files));
     } else {
-        alert('No File Exists');
+        alert('Only .mp4 type file support');
     }
 }
 
@@ -207,41 +290,97 @@ function formatBytes(bytes, decimals = 2) {
 }
 
 // file list loading
-function handleFileInput(event, files = event.dataTransfer.items) {
+// function handleFileInput(event, files = event.dataTransfer.items) {
+//     event.preventDefault();
+//     const items = event.dataTransfer ? event.dataTransfer.items : [];
+//     const promises = [];
+
+//     if (items.length) {
+//         for (let i = 0; i < items.length; i++) {
+//             let entry = items[i].webkitGetAsEntry();
+//             if (entry) {
+//                 promises.push(readEntry(entry));
+//             }
+//         }
+//     } else {
+//         files = Array.from(files);
+//         files.forEach(file => promises.push(Promise.resolve([file])));
+//     }
+
+//     Promise.all(promises).then(results => {
+//         const allFiles = results.flat(Infinity);
+//         updateFileList(allFiles);
+//     });
+// }
+
+function handleFileInput(event) {
     event.preventDefault();
-    const items = event.dataTransfer ? event.dataTransfer.items : [];
     const promises = [];
 
-    if (items.length) {
+    if (event.dataTransfer && event.dataTransfer.items) {
+        // 处理拖放文件
+        const items = event.dataTransfer.items;
         for (let i = 0; i < items.length; i++) {
-            let entry = items[i].webkitGetAsEntry();
-            if (entry) {
-                promises.push(readEntry(entry));
+            if (items[i].kind === 'file') {
+                const entry = items[i].webkitGetAsEntry();
+                if (entry) {
+                    promises.push(readEntry(entry));
+                }
             }
         }
-    } else {
-        files = Array.from(files);
-        files.forEach(file => promises.push(Promise.resolve([file])));
-    }
 
-    Promise.all(promises).then(results => {
-        const allFiles = results.flat(Infinity);
-        updateFileList(allFiles);
-    });
+        Promise.all(promises).then(results => {
+            const allFiles = results.flat(Infinity);
+            updateFileList(allFiles);
+        });
+    } else if (event.target && event.target.files) {
+        // 处理通过文件输入选择的文件
+        const files = event.target.files;
+        const mp4Files = [];
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            if (file.name.toLowerCase().endsWith('.mp4')) {
+                mp4Files.push(file);
+            }
+        }
+
+        if (mp4Files.length > 0) {
+            updateFileList(mp4Files);
+        } else {
+            alert('Not found .mp4 file. Please check upload foler again.');
+        }
+    }
 }
+
 
 function readEntry(entry) {
     if (entry.isFile) {
         return new Promise(resolve => {
             entry.file(file => {
-                resolve([file]);
+                if (file.name.toLowerCase().endsWith('.mp4')) {
+                    resolve([file]);
+                } else {
+                    resolve([]);
+                }
             });
         });
     } else if (entry.isDirectory) {
         let dirReader = entry.createReader();
-        return new Promise(resolve => dirReader.readEntries(entries => {
-            Promise.all(entries.map(readEntry)).then(files => resolve(files.flat(Infinity))); // map to entry
-        }));
+        return new Promise(resolve => {
+            const entries = [];
+            const readEntries = () => {
+                dirReader.readEntries(results => {
+                    if (!results.length) {
+                        // 递归处理目录中的所有条目
+                        Promise.all(entries.map(readEntry)).then(files => resolve(files.flat(Infinity)));
+                    } else {
+                        entries.push(...results);
+                        readEntries();
+                    }
+                });
+            };
+            readEntries();
+        });
     }
 }
 
@@ -325,7 +464,7 @@ function uploadFile(file, progressBar, icon) {
                 offset += Infinity;
                 icon.className = "bi bi-x-circle-fill text-danger";
                 progressBar.querySelector('.progress-bar').style.width = 100 + '%';
-                progressBar.querySelector('.progress-bar').textContent = `error ${xhr.status}:` + JSON.parse(xhr.responseText).error || status;
+                progressBar.querySelector('.progress-bar').textContent = `error ${xhr.status}:` + JSON.parse(xhr.responseText).message;
                 progressBar.querySelector('.progress-bar').className = 'progress-bar progress-bar-striped bg-danger';
                 uploadChunk();
             }
@@ -335,6 +474,7 @@ function uploadFile(file, progressBar, icon) {
                 if (uploadQueue.length === 0 && activeUploads === 0) {
                     if (xhr.status === 200) {
                         alert('업로드 완료!');
+                        location.reload();
                     }else if (xhr.status !== 200) {
                         alert('실패한 파일을 확인해주세요.');
                     }

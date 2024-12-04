@@ -3,12 +3,14 @@ from django.http import JsonResponse
 from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
-from .models import PanoramaImage,PanoramaVideo
+from .models import PanoramaImage,PanoramaVideo,TypeInfo
 import os
 import aiofiles
 import asyncio
 import cv2
 import numpy as np
+import json
+import base64
 
 # Create your views here.
 
@@ -24,16 +26,43 @@ def index(request):
         if first_image:
             # 如果有帧图片，获取图片的 URL
             image_url = os.path.join(settings.MEDIA_URL, first_image.image.url)
+            image_path = first_image.image.path
+            image = cv2.imread(image_path)
+
+            if image is not None:
+                h, w, _ = image.shape
+                face_w = w // 6
+                face_h = h
+
+                interface = image[:, face_w * 4 : face_w * 5]
+                _, buffer = cv2.imencode('.jpg', interface)
+                img_base64 = base64.b64encode(buffer).decode('utf-8')
+                img_data = f"data:image/jpeg;base64,{img_base64}"
+                # 构造传递给前端的数据
+                video_data.append({
+                    'video_id': video.id,
+                    'video_name': video.name,
+                    'first_image': img_data,
+                })
+            else:
+                # 如果无法读取图像，使用占位图
+                image_url = os.path.join(settings.STATIC_URL, 'placeholder.png')
+                video_data.append({
+                    'video_id': video.id,
+                    'video_name': video.name,
+                    'first_image': image_url,
+                })
+
         else:
             # 如果没有帧图片，可以设置一个占位图或 None
             image_url = os.path.join(settings.STATIC_URL, 'placeholder.png')  # 替换为实际的占位图片路径
         
-        # 构造传递给前端的数据
-        video_data.append({
-            'video_id': video.id,
-            'video_name': video.name,
-            'first_image': image_url,
-        })
+            # 构造传递给前端的数据
+            video_data.append({
+                'video_id': video.id,
+                'video_name': video.name,
+                'first_image': image_url,
+            })
 
     context = {
         'data': video_data,  # 每个视频及其对应第一帧图片的数据
@@ -250,8 +279,10 @@ def videoupload(request):
                 if status == 200:
                     return JsonResponse({'message': "file upload success"}, status=200)
                 elif status == 406:
+                    video_obj.delete()
                     return JsonResponse({'message': 'can not open video file'}, status=406)
             except:
+                video_obj.delete()
                 return JsonResponse({'message': 'crop frame failed'}, status=406)
 
         return JsonResponse({'status': 'partial'})
@@ -260,14 +291,51 @@ def videoupload(request):
 def view(request, video_id):
     video = get_object_or_404(PanoramaVideo, id=video_id)
     frames = PanoramaImage.objects.filter(video_id=video_id).order_by('id')
-    frame_urls = [frame.image.url for frame in frames]
-
+    images = [{'id': frame.id, 'url': frame.image.url} for frame in frames]
+    
     context = {
         'video': video,
-        'frames': frame_urls,
+        'images': images,
     }
 
     return render(request, 'map/view.html', context)
 
+def info_position(request):
+    '''
+        type info position && text value
+    '''
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        text = data.get('text')
+        position = data.get('position')
+        x = position.get('x')
+        y = position.get('y')
+        z = position.get('z')
+        image_id = data.get('image_id')
+
+        TypeInfo.objects.create(
+            text = text,
+            x = x,
+            y = y,
+            z = z,
+            image_id = PanoramaImage.objects.get(id=image_id)
+        )
+
+        return JsonResponse({'message':'success'},status=200)
+    elif request.method == "GET":
+        image_id = request.GET.get('image_id')
+        if image_id:
+            type_objs = TypeInfo.objects.filter(image_id=image_id)
+            data = []
+            for obj in type_objs:
+                data.append({
+                    'id': obj.id,
+                    'text': obj.text,
+                    'position': {'x': obj.x, 'y': obj.y, 'z': obj.z},
+                })
+
+            return JsonResponse({"data": data}, status=200)
+        else:
+            return JsonResponse({"message": "No image id matching"}, status=404)
 
 
