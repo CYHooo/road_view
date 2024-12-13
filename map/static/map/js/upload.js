@@ -289,29 +289,6 @@ function formatBytes(bytes, decimals = 2) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
 
-// file list loading
-// function handleFileInput(event, files = event.dataTransfer.items) {
-//     event.preventDefault();
-//     const items = event.dataTransfer ? event.dataTransfer.items : [];
-//     const promises = [];
-
-//     if (items.length) {
-//         for (let i = 0; i < items.length; i++) {
-//             let entry = items[i].webkitGetAsEntry();
-//             if (entry) {
-//                 promises.push(readEntry(entry));
-//             }
-//         }
-//     } else {
-//         files = Array.from(files);
-//         files.forEach(file => promises.push(Promise.resolve([file])));
-//     }
-
-//     Promise.all(promises).then(results => {
-//         const allFiles = results.flat(Infinity);
-//         updateFileList(allFiles);
-//     });
-// }
 
 function handleFileInput(event) {
     event.preventDefault();

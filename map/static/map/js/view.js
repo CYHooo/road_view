@@ -1,11 +1,12 @@
+// main.js
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 import { Tween, Group, Easing } from "@tweenjs/tween.js";
 import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
-import { update } from '@tweenjs/tween.js';
-
+import { createForm, initFormEvent } from './form.js';
+import { setScene, setPointerConctrols, setMarkers } from './param.js';
 
 let camera,controls;
 let renderer;
@@ -16,11 +17,9 @@ let index = 0;
 let gui, conf;
 let pointerControls;
 let infostatus = false;
-// let point, info, infoDiv;
 let csrftoken;
 let markers = [];
 const buttons = [];
-
 const tweenGroup = new Group();
 
 
@@ -49,7 +48,7 @@ function init() {
     container.appendChild(labelRenderer.domElement);
 
     scene = new THREE.Scene();
-
+    setScene(scene);
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
     camera.position.set(0, 0, 0.1);
 
@@ -57,8 +56,8 @@ function init() {
     controls = new OrbitControls( camera, renderer.domElement );
     controls.enablePan = false;
     controls.zoomSpeed = 10;
-    controls.enableZoom = true;
-    controls.maxDistance = 0.1;
+    controls.enableZoom = false;
+    // controls.maxDistance = 0.1;
 
     loadImage(index); // load image
     createPanel(); // set up check point panel
@@ -70,126 +69,140 @@ function init() {
 
 function loadImage(index) {
     const textures = getTexturesFromAtlasFile( images[index].url, 6 );
-    
-
     const materials = textures.map(texture => new THREE.MeshBasicMaterial({ map: texture }));
-
+    // clear mark point
+    clearMarkers();
     if (box) {
         box.material = materials; // 替换材质
     } else {
         // 初始化 Box
-        box = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), materials);
-        box.geometry.scale(1, 1, -1); // 翻转以从内部观察
+        box = new THREE.Mesh(new THREE.BoxGeometry(10, 10, 10), materials);
+        box.geometry.scale(10, 10, -10); // 翻转以从内部观察
         scene.add(box);
     }
 
-    // clear mark point
-    clearMarkers();
+    
 
     // GET TypeInfo data
-    fetch(`/info_position/?image_id=${images[index].id}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.data) {
-                const typeInfos = data.data;
-                typeInfos.forEach(typeInfo => {
-                    const position = new THREE.Vector3(
-                        typeInfo.position.x,
-                        typeInfo.position.y,
-                        typeInfo.position.z,
-                    );
-                    const text = typeInfo.text;
-                    
-                    const marker = createMarker(position, text);
-                    markers.push(marker);
-                });
-            } else {
-                console.log('Error', data.message)
-            }
-        })
-        .catch(error => {
-            console.error('Error fetching type info data', error);
-        });
+    fetch(`/form_update/?image_id=${images[index].id}`, {
+        method: 'GET',
+    })
+    .then(response => response.json())
+    .then(json => {
+        if (json.data) {
+            const infoDatas = json.data;
+            infoDatas.forEach(info => {
+                const marker = createMarker(info);
+                markers.push(marker);
+                setMarkers(markers);
+            });
+        } else {
+            console.log('Error', data.message)
+        }
+    })
+    .catch(error => {
+        console.error('Error fetching type info data', error);
+    });
 }
 
 
 function clearMarkers() {
     markers.forEach(marker => {
+        removeClickEventFromSprite(marker);
         scene.remove(marker);
     });
-    markers = [];
+    setMarkers(markers);
+    const infoObjects = scene.children.filter(obj => obj instanceof CSS2DObject);
+    infoObjects.forEach(i => scene.remove(i));
+
+    // markers = [];
 }
 
 
-function createMarker(position, text) {
-    const pointDiv = document.createElement('div');
-    pointDiv.style.width = '12px';
-    pointDiv.style.height = '12px';
-    pointDiv.style.backgroundColor = 'red';
-    pointDiv.style.borderRadius = '50%';
-    pointDiv.style.zIndex = '10';
-    pointDiv.style.cursor = 'pointer';
-    pointDiv.style.pointerEvents = 'auto';
-    // pointDiv.style.position = 'absolute';
-
-    const point = new CSS2DObject(pointDiv);
-    point.position.copy(position);
-    scene.add(point);
-
-    pointDiv.addEventListener('click', () => showInfoBox(pointDiv, position, text));
-
-    return point;
+function createMarker(info) {
+    const textureLoader = new THREE.TextureLoader();
+    const iconTexture = textureLoader.load('/static/map/svg/info-circle-fill.svg');
+    const spriteMaterial = new THREE.SpriteMaterial({ map: iconTexture });
+    const sprite = new THREE.Sprite(spriteMaterial);
+    sprite.scale.set(0.4,0.4,0);
+    sprite.position.set(info.position.x, info.position.y, info.position.z);
+    sprite.userData = {info};
+    clickEventToSprite(sprite);
+    
+    
+    scene.add(sprite);
+    setScene(scene);
+    return sprite;
 }
 
-function showInfoBox(pointDiv, position, text) {
+
+function clickEventToSprite(sprite) {
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    function onClick(e) {
+        mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+        raycaster.setFromCamera(mouse, camera);
+
+        const intersects = raycaster.intersectObject(sprite);
+        if (intersects.length > 0) {
+            if (sprite.userData.isInfoBoxOpen) return;
+
+            sprite.userData.isInfoBoxOpen = true;
+
+            const { info, } = sprite.userData;
+            showInfoBox(info, sprite);
+        }
+    }
+    // 移除之前的事件监听器，避免重复添加
+    if (sprite.onClickHandler) {
+        window.removeEventListener('click', sprite.onClickHandler);
+    }
+
+    // 绑定新的事件监听器
+    sprite.onClickHandler = onClick;
+    window.addEventListener('click', sprite.onClickHandler);
+}
+
+function removeClickEventFromSprite(sprite) {
+    if (sprite.onClickHandler) {
+        window.removeEventListener('click', sprite.onClickHandler);
+    }
+}
+
+function showInfoBox(info, sprite) {
+    
+
     const infoDiv = document.createElement('div');
-    // infoDiv.style.position = 'absolute';
     infoDiv.style.padding = '10px';
     infoDiv.style.backgroundColor = 'rgba(255, 255, 255, 0.6)';
     infoDiv.style.color = 'black';
     infoDiv.style.borderRadius = '10px';
-    infoDiv.style.zIndex = '10';
-    infoDiv.style.width = '250px';
-    infoDiv.style.height = '150px';
+    infoDiv.style.zIndex = '40';
+    infoDiv.classList = "container"
     infoDiv.style.pointerEvents = 'auto';
 
-    pointDiv.style.pointerEvents = 'none';
+    const infoForm = document.createElement('div');
+    infoForm.innerHTML = createForm(info);
+    infoDiv.appendChild(infoForm);
 
-    const textDiv = document.createElement('div');
-    textDiv.classList = "form-floating mb-3";
-    textDiv.innerHTML = `
-        <input type="text" class="form-control" id="infoType" placeholder="label name" value="${text}" disabled>
-        <label for="infoType">Label</label>
-    `
-    infoDiv.appendChild(textDiv);
 
-    const closeButton = document.createElement('button');
-    closeButton.textContent = 'Close';
-    closeButton.classList = 'btn btn-secondary';
-    closeButton.style.float = 'right';
-    closeButton.addEventListener('click', function() {
-        scene.remove(info);
-        pointDiv.style.pointerEvents = 'auto';
+    const infoObj = new CSS2DObject(infoDiv);
+    infoObj.position.copy(sprite.position);
+
+
+    scene.add(infoObj);
+    setScene(scene);
+
+    requestAnimationFrame(() => {
+        initFormEvent(sprite.position, infoObj, index, info);
+        sprite.userData.showInfoBox = false;
     });
-    infoDiv.appendChild(closeButton);
 
-    const info = new CSS2DObject(infoDiv);
-
-    const cameraDirection = new THREE.Vector3();
-    camera.getWorldDirection(cameraDirection);
-
-    const cameraUp = new THREE.Vector3();
-    cameraUp.copy(camera.up).normalize();
-
-    const cameraRight = new THREE.Vector3();
-    cameraRight.crossVectors(cameraUp, cameraDirection).normalize();
-
-    const offsetDistance = -3;
-    const infoPostion = new THREE.Vector3().copy(position).add(cameraRight.multiplyScalar(offsetDistance));
-
-    info.position.copy(infoPostion);
-    scene.add(info);
 }
+
 
 function getTexturesFromAtlasFile( imgURL, num ) {
     const textures = [];
@@ -252,7 +265,7 @@ function capturePoint() {
     info.style.display = 'flex';
 
     pointerControls = new PointerLockControls(camera, renderer.domElement);
-
+    setPointerConctrols(pointerControls);
     // 点击 info 启动 PointerLockControls
     info.addEventListener('click', function () {
         pointerControls.lock();
@@ -265,6 +278,7 @@ function capturePoint() {
         blocker.style.display = 'none'; // 隐藏 blocker
         crosshair.style.display = 'block'; // 显示十字标记
         document.addEventListener('click', onMouseClick);
+        infostatus = false;
     });
 
     pointerControls.addEventListener('unlock', function () {
@@ -278,8 +292,15 @@ function capturePoint() {
 }
 
 function onMouseClick() {
+    buttons.forEach(b => {
+        scene.remove(b);
+    });
+    buttons.length = 0;
     infostatus = true;
+
     document.removeEventListener('click', onMouseClick);
+    crosshair.style.display = 'none';
+    // controls.enabled = true;
     // 获取摄像机方向
     const direction = new THREE.Vector3();
     camera.getWorldDirection(direction);
@@ -289,18 +310,16 @@ function onMouseClick() {
     const position = new THREE.Vector3().copy(camera.position).add(direction.multiplyScalar(distance));
 
     const pointDiv = document.createElement('div');
-    pointDiv.style.width = '12px';
-    pointDiv.style.height = '12px';
-    pointDiv.style.borderRadius = '50%';
-    pointDiv.style.backgroundColor = 'red';
-    // pointDiv.style.position = 'absolute';
+    pointDiv.innerHTML = `   
+            <i class="bi bi-info-circle-fill text-warning fs-3"></i>
+        `
     pointDiv.style.zIndex = '10';
     pointDiv.style.cursor = 'pointer';
     pointDiv.style.pointerEvents = 'auto';
 
-    const point = new CSS2DObject(pointDiv);
-    point.position.copy(position);
-    scene.add(point);
+    const pointObj = new CSS2DObject(pointDiv);
+    pointObj.position.copy(position);
+    
 
     // 创建信息框
     const infoDiv = document.createElement('div');
@@ -309,38 +328,18 @@ function onMouseClick() {
     infoDiv.style.backgroundColor = 'rgba(255, 255, 255, 0.6)';
     infoDiv.style.color = 'white';
     infoDiv.style.borderRadius = '10px';
-    infoDiv.style.zIndex = '10';
-    infoDiv.style.width = '250px';
-    infoDiv.style.height = '150px';
+    infoDiv.classList = "container"
+    infoDiv.style.zIndex = "30";
     infoDiv.style.pointerEvents = 'auto';
 
-    const input = document.createElement('div');
-    input.classList = 'mb-2 form-floating';
-    input.innerHTML = `
-        <input type="text" class="form-control" id="typeInput" placeholder="Please Input Type Name">    
-        <label for="typeInput" class="text-dark">Label</label><br>
-    `
-    infoDiv.appendChild(input);
-
-    const buttonGroup = document.createElement('div');
-    buttonGroup.classList = 'd-grid gap-2 d-md-flex justify-content-md-end mb-3';
-
-    const saveButton = document.createElement('button');
-    saveButton.id = 'save-btn';
-    saveButton.classList = "btn btn-primary me-md-2";
-    saveButton.textContent = 'Save';
-    saveButton.type = 'submit';
-
-    const cancelButton = document.createElement('button');
-    cancelButton.id = 'cancel-btn';
-    cancelButton.classList = 'btn btn-secondary';
-    cancelButton.textContent = 'Cancel';
-
-    buttonGroup.appendChild(saveButton);
-    buttonGroup.appendChild(cancelButton);
-    infoDiv.appendChild(buttonGroup);
-
-    const info = new CSS2DObject(infoDiv);
+    const inputForm = document.createElement('div');
+    inputForm.classList = 'mb-2';
+    inputForm.id = 'type-form';
+    inputForm.innerHTML = createForm(); // 使用导入的表单
+    
+    infoDiv.appendChild(inputForm);
+    
+    const infoObj = new CSS2DObject(infoDiv);
     const cameraDirection = new THREE.Vector3();
     pointerControls.getDirection(cameraDirection);
 
@@ -356,114 +355,64 @@ function onMouseClick() {
     const offsetDistance = -3; // 可以根据需要调整
 
     // 计算信息框的位置
-    const infoPosition = new THREE.Vector3().copy(position).add(cameraRight.multiplyScalar(offsetDistance));
-
-    info.position.copy(infoPosition);
-    scene.add(info);
-
+    const infoPosition = new THREE.Vector3().copy(position);
+    // .add(cameraRight.multiplyScalar(offsetDistance));
+    infoObj.position.copy(infoPosition);
+    scene.add(infoObj);
+    scene.add(pointObj);
+    requestAnimationFrame(() => {
+        initFormEvent(pointObj, infoObj, index, info);
+    });
     pointerControls.unlock();
 
-    // 保存按钮点击逻辑
-    saveButton.addEventListener('click', () => onSaveClick(point, info));
-
-    // 取消按钮点击逻辑
-    cancelButton.addEventListener('click', () => onCancelClick(point, info));
-}
-
-function onSaveClick(pointObj, infoObj) {
-    infostatus = false;
-    // infoDiv.style.opacity = '0';
-    
-    const textValue = infoObj.element.querySelector('#typeInput').value;
-
-    const data = {
-        text: textValue,
-        position: {
-            x: pointObj.position.x,
-            y: pointObj.position.y,
-            z: pointObj.position.z,
-        },
-        image_id: images[index].id
-    }
-    scene.remove(infoObj);
-    csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-
-    fetch('/info_position/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': csrftoken
-        },
-        body: JSON.stringify(data)
-    })
-    .then(response => {
-        if (response.ok) {
-            console.log('Data save success');
-            scene.remove(pointObj);
-            scene.remove(infoObj);
-
-            const savedPoint = createMarker(pointObj.position.clone(), textValue);
-            markers.push(savedPoint);
-            pointerControls.lock();
-        } else {
-            alert('info save failed');
-        }
-    })
-    .catch(error => {
-        console.error('Error', error);
-    });
-    
-}
-
-function onCancelClick(pointObj, infoObj) {
-    infostatus = false;
-    scene.remove(pointObj);
-    scene.remove(infoObj);
-    
-    pointerControls.lock();
 }
 
 function createButton(text, position, onClick) {
     const button = document.createElement('button');
     button.textContent = text;
-    button.style.position = 'absolute';
-    // button.style.top = '50%';
-    button.style.transform = 'translateY(-50%)';
+    button.style.position = 'fixed';
+    button.classList = 'btn btn-outline-info';
+    button.style.width = '100px';
+    button.style.height = '50px';
+    // button.style.transform = 'translateY(-50%)';
     button.style.padding = '10px';
     button.style.cursor = 'pointer';
-    button.style.zIndex = 10;
-    button.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-    button.style.color = 'white';
+    button.style.zIndex = 1000;
+    // button.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+    // button.style.color = 'white';
     button.style.pointerEvents = 'auto';
 
+    // 根据 position 决定按钮的具体位置
+    if (position === 'left') {
+        button.style.left = '10px'; // 距离屏幕左边 10px
+        button.style.top = '50%'; // 居中显示
+        button.style.transform = 'translateY(-50%)';
+    } else if (position === 'right') {
+        button.style.right = '10px'; // 距离屏幕右边 10px
+        button.style.top = '50%'; // 居中显示
+        button.style.transform = 'translateY(-50%)';
+    }
+
     button.addEventListener('click', onClick);
-    
-    const label = new CSS2DObject(button);
-    label.position.copy(position);
-    scene.add(label);
-    
-    return label;
+    document.body.appendChild(button); // 将按钮添加到页面上，而不是场景中
+
+    return button;
 }
 
 function updateButton() {
     // 清除现有按钮
-    // box.children.forEach(child => {
-    //     if (child instanceof CSS2DObject) {
-    //         box.remove(child);
-    //     }
-    // });
     buttons.forEach(b => {
         scene.remove(b);
     });
     buttons.length = 0;
 
     if (index > 0) {
-        const preButton = createButton('Previous', new THREE.Vector3(0, -0.5, 1), () => transitionToImage(index - 1, -0.1));
+        const preButton = createButton('Previous', 'left', () => transitionToImage(index - 1, -0.1));
         buttons.push(preButton);
     }
 
     if (index < images.length - 1) {
-        const nextButton = createButton('Next', new THREE.Vector3(0, -0.5, -1), () => transitionToImage(index + 1, 0.1));
+        const nextButton = createButton('Next', 'right', () => transitionToImage(index + 1, 0.1));
         buttons.push(nextButton);
     }
 
@@ -519,15 +468,13 @@ function onWindowResize() {
 
 function animate() {
     if (pointerControls && pointerControls.isLocked) {
-        // PointerLockControls 被锁定时更新
         pointerControls.update();
-    } else {
-        // controls.update(); // 更新 OrbitControls
-    }
+    } 
     tweenGroup.update();
     // 更新相机矩阵
-    camera.updateMatrixWorld();
+    // camera.updateMatrixWorld();
     renderer.render( scene, camera );
     labelRenderer.render(scene, camera);
-
 }
+
+export { createMarker, clickEventToSprite, clearMarkers }

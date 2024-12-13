@@ -3,6 +3,7 @@ from django.http import JsonResponse
 from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
+from django.db import transaction
 from .models import PanoramaImage,PanoramaVideo,TypeInfo
 import os
 import aiofiles
@@ -11,6 +12,7 @@ import cv2
 import numpy as np
 import json
 import base64
+from .form import TreeInfoForm
 
 # Create your views here.
 
@@ -300,28 +302,75 @@ def view(request, video_id):
 
     return render(request, 'map/view.html', context)
 
-def info_position(request):
+@transaction.atomic
+def form_update(request):
     '''
         type info position && text value
     '''
     if request.method == 'POST':
-        data = json.loads(request.body)
-        text = data.get('text')
-        position = data.get('position')
-        x = position.get('x')
-        y = position.get('y')
-        z = position.get('z')
-        image_id = data.get('image_id')
+        form = TreeInfoForm(request.POST, request.FILES)
+        if form.is_valid():
+            try:
+                data = form.cleaned_data
+                save_path = os.path.join(settings.MEDIA_ROOT, 'tree', str(data['imageId']))
+                os.makedirs(save_path, exist_ok=True)
+                form_obj, created = TypeInfo.objects.get_or_create(
+                    x=data['x'], 
+                    y=data['y'], 
+                    z=data['z'],
+                    image_id = PanoramaImage.objects.get(id=data['imageId']),
+                    defaults={
+                        'address': data['address'],
+                        'tree_type': data['treeType'],
+                        'tree_num': data['treeNum'],
+                        'diameter': data['diameter'],
+                        'tree_height': data['treeHeight'],
+                        'crown_width': data['treeWidth'],
+                        'tree_use': data['treeUse'],
+                        'worker_type': data['workerType'],
+                        'worker_name': data['workerName'],
+                    }
+                )
+                if not created:
+                    # 如果对象已存在，更新字段
+                    field_mapping = {
+                        'address': 'address',
+                        'treeType': 'tree_type',
+                        'treeNum': 'tree_num',
+                        'diameter': 'diameter',
+                        'treeHeight': 'tree_height',
+                        'treeWidth': 'crown_width',
+                        'treeUse': 'tree_use',
+                        'workerType': 'worker_type',
+                        'workerName': 'worker_name',
+                    }
 
-        TypeInfo.objects.create(
-            text = text,
-            x = x,
-            y = y,
-            z = z,
-            image_id = PanoramaImage.objects.get(id=image_id)
-        )
+                    for form_field, model_field in field_mapping.items():
+                        setattr(form_obj, model_field, data.get(form_field))
 
-        return JsonResponse({'message':'success'},status=200)
+                    form_obj.save()
+
+                # 定义文件字段映射： (表单字段名, 模型字段名, 文件前缀)
+                image_fields = [
+                    ('pre', 'front_image', 'pre'),
+                    ('west', 'west_image', 'west'),
+                    ('east', 'east_image', 'east'),
+                    ('south', 'south_image', 'south'),
+                    ('north', 'north_image', 'north'),
+                ]
+
+                for form_field, model_field, prefix in image_fields:
+                    file_obj = data.get(form_field)
+                    if file_obj:
+                        # 构建相对路径
+                        relative_path = f"{data['image_id']}/{prefix}_{file_obj.name}"
+                        # 保存文件
+                        getattr(form_obj, model_field).save(relative_path, file_obj, save=True)
+                return JsonResponse({'success': True})
+            except Exception as e:
+                return JsonResponse({'success': False, 'error': str(e)}, status=500)
+        else:
+            return JsonResponse({"message": "form data not valid"}, status=404)
     elif request.method == "GET":
         image_id = request.GET.get('image_id')
         if image_id:
@@ -330,7 +379,20 @@ def info_position(request):
             for obj in type_objs:
                 data.append({
                     'id': obj.id,
-                    'text': obj.text,
+                    'address': obj.address,
+                    'treeType': obj.tree_type,
+                    'treeNum': obj.tree_num,
+                    'diameter': obj.diameter,
+                    'treeHeight': obj.tree_height,
+                    'treeWidth': obj.crown_width,
+                    'treeUse': obj.tree_use,
+                    'workerName': obj.worker_name,
+                    'workerType': obj.worker_type,
+                    'pre_img': obj.front_image.url if obj.front_image else None,
+                    'north_img': obj.north_image.url if obj.north_image else None,
+                    'south_img': obj.south_image.url if obj.south_image else None,
+                    'east_img': obj.east_image.url if obj.east_image else None,
+                    'west_img': obj.west_image.url if obj.west_image else None,
                     'position': {'x': obj.x, 'y': obj.y, 'z': obj.z},
                 })
 
@@ -339,3 +401,5 @@ def info_position(request):
             return JsonResponse({"message": "No image id matching"}, status=404)
 
 
+def form_data(request):
+    pass

@@ -30,7 +30,20 @@ class PanoramaImage(models.Model):
     
 class TypeInfo(models.Model):
     id = models.AutoField(primary_key=True)
-    text = models.CharField(max_length=256)
+    address = models.CharField(max_length=256, verbose_name='장소')
+    tree_type = models.CharField(max_length=256, verbose_name='수종')
+    tree_num = models.IntegerField(verbose_name='수목')
+    diameter = models.FloatField(verbose_name='흉고직경')
+    tree_height = models.FloatField(verbose_name='수고')
+    crown_width = models.FloatField(verbose_name='수관폭')
+    tree_use = models.CharField(max_length=256, verbose_name='사용기종')
+    worker_type = models.CharField(max_length=256, verbose_name='측정자 소속')
+    worker_name = models.CharField(max_length=256, verbose_name='측정자 성명')
+    front_image = models.ImageField(max_length=256, upload_to='tree/', null=True, blank=True)
+    north_image = models.ImageField(max_length=256, upload_to='tree/', null=True, blank=True)
+    south_image = models.ImageField(max_length=256, upload_to='tree/', null=True, blank=True)
+    east_image = models.ImageField(max_length=256, upload_to='tree/', null=True, blank=True)
+    west_image = models.ImageField(max_length=256, upload_to='tree/', null=True, blank=True)
     x = models.FloatField()
     y = models.FloatField()
     z = models.FloatField()
@@ -41,4 +54,4 @@ class TypeInfo(models.Model):
         db_table = 'type_info'
 
     def __str__(self) -> str:
-        return f'{self.id} - Type: {self.text} - Image: {self.image_id.id}'
+        return f'{self.id} - {self.address} - Image: {self.image_id.id}'
