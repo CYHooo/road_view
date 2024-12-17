@@ -13,6 +13,7 @@ import numpy as np
 import json
 import base64
 from .form import TreeInfoForm
+import decimal
 
 # Create your views here.
 
@@ -315,9 +316,9 @@ def form_update(request):
                 save_path = os.path.join(settings.MEDIA_ROOT, 'tree', str(data['imageId']))
                 os.makedirs(save_path, exist_ok=True)
                 form_obj, created = TypeInfo.objects.get_or_create(
-                    x=data['x'], 
-                    y=data['y'], 
-                    z=data['z'],
+                    x=decimal.Decimal(data['x']).quantize(decimal.Decimal("00000000.000000")) ,
+                    y=decimal.Decimal(data['y']).quantize(decimal.Decimal("00000000.000000")) ,
+                    z=decimal.Decimal(data['z']).quantize(decimal.Decimal("00000000.000000")) ,
                     image_id = PanoramaImage.objects.get(id=data['imageId']),
                     defaults={
                         'address': data['address'],
@@ -363,10 +364,29 @@ def form_update(request):
                     file_obj = data.get(form_field)
                     if file_obj:
                         # 构建相对路径
-                        relative_path = f"{data['image_id']}/{prefix}_{file_obj.name}"
+                        relative_path = f"{data['imageId']}/{prefix}_{file_obj.name}"
                         # 保存文件
                         getattr(form_obj, model_field).save(relative_path, file_obj, save=True)
-                return JsonResponse({'success': True})
+                return JsonResponse({
+                            'success': True,
+                            'updatedData': {
+                                'address': form_obj.address,
+                                'treeType': form_obj.tree_type,
+                                'treeNum': form_obj.tree_num,
+                                'diameter': form_obj.diameter,
+                                'treeHeight': form_obj.tree_height,
+                                'treeWidth': form_obj.crown_width,
+                                'treeUse': form_obj.tree_use,
+                                'workerType': form_obj.worker_type,
+                                'workerName': form_obj.worker_name,
+                                'pre_img': form_obj.front_image.url if form_obj.front_image else None,
+                                'west_img': form_obj.west_image.url if form_obj.west_image else None,
+                                'east_img': form_obj.east_image.url if form_obj.east_image else None,
+                                'south_img': form_obj.south_image.url if form_obj.south_image else None,
+                                'north_img': form_obj.north_image.url if form_obj.north_image else None,
+                                'position': {'x':form_obj.x, 'y':form_obj.y, 'z':form_obj.z}
+                            }
+                        }, status=200)
             except Exception as e:
                 return JsonResponse({'success': False, 'error': str(e)}, status=500)
         else:

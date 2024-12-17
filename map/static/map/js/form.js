@@ -5,9 +5,8 @@
  * Data include tree info && work images.
 */
 import { scene, pointerControls, markers, setScene } from './param.js';
-import { createMarker, clickEventToSprite, clearMarkers } from './view.js';
+import { createMarker, clickEventToSprite, clearMarkers, loadImage } from './view.js';
 
-let formContainer = null;
 let selectedImages = {}; // 用于保存用户选择但尚未提交的图片文件
 let infostatus = true;
 
@@ -16,7 +15,7 @@ let infostatus = true;
  * create form HTML
  * @returns {HTMLFormElement}
  */
-function createForm(infoDatas = null) {
+function createForm(infoDatas=null) {
     // 创建一个包含表单布局的 HTML 字符串
     const formHTML = `
         
@@ -45,24 +44,19 @@ function createForm(infoDatas = null) {
 
                         <!-- 第二行：흉고직경、수고、수관폭 -->
                         <div class="row g-1">
-                            <div class="col-5">
+                            <div class="col">
                                 <div class="input-group">
                                     <span class="input-group-text font-monospace text-bg-dark bg-opacity-75" >흉고직경</span>
                                     <input id="diameter" value="${infoDatas ? infoDatas.diameter : ''}" type="number" class="form-control" placeholder="흉고직경" aria-label="diameter">
                                 </div>
                             </div>
-                            <div class="col-3">
+                            <div class="col">
                                 <div class="input-group">
                                     <span class="input-group-text font-monospace text-bg-dark bg-opacity-75">수고</span>
                                     <input id="treeHeight" value="${infoDatas ? infoDatas.treeHeight : ''}" type="number" class="form-control" placeholder="수 고" aria-label="treeHeight">
                                 </div>
                             </div>
-                            <div class="col">
-                                <div class="input-group">
-                                    <span class="input-group-text font-monospace text-bg-dark bg-opacity-75">수관폭</span>
-                                    <input id="treeWidth" value="${infoDatas ? infoDatas.treeWidth : ''}" type="number" class="form-control" placeholder="수관폭" aria-label="treeWidth">
-                                </div>
-                            </div>
+                            
                         </div>
                     </div>
 
@@ -217,7 +211,7 @@ function createForm(infoDatas = null) {
     return formHTML;
 }
 
-function initFormEvent(pointObj, infoObj, index, info) {
+function initFormEvent(pointObj, infoObj, index, sprite) {
     const placeholder = document.querySelectorAll('.img-placeholder');
     const saveButton = document.getElementById('save-btn');
     const cancelButton = document.getElementById('cancel-btn');
@@ -226,10 +220,10 @@ function initFormEvent(pointObj, infoObj, index, info) {
         p.addEventListener('click', () => clickForUploadImage(p))
     });
     // 保存按钮点击逻辑
-    saveButton.addEventListener('click', () => onSaveClick(pointObj, infoObj, index, info));
+    saveButton.addEventListener('click', () => onSaveClick(pointObj, infoObj, index, sprite));
 
     // 取消按钮点击逻辑
-    cancelButton.addEventListener('click', () => onCancelClick(pointObj, infoObj, info));
+    cancelButton.addEventListener('click', () => onCancelClick(sprite, infoObj));
 }
 
 function clickForUploadImage(p) {
@@ -264,7 +258,7 @@ function clickForUploadImage(p) {
     document.body.removeChild(fileInput);
 }
 
-function onSaveClick(pointObj, infoObj, index, info) {
+function onSaveClick(pointObj, infoObj, index, sprite) {
     infostatus = false;
     
     const fields = [
@@ -293,9 +287,9 @@ function onSaveClick(pointObj, infoObj, index, info) {
     });
 
     data.position = {
-        x: pointObj.position.x,
-        y: pointObj.position.y,
-        z: pointObj.position.z,
+        x: pointObj?.position?.x ?? pointObj.x,
+        y: pointObj?.position?.y ?? pointObj.y,
+        z: pointObj?.position?.z ?? pointObj.z,
     };
     data.imageId = images[index].id;
 
@@ -321,20 +315,24 @@ function onSaveClick(pointObj, infoObj, index, info) {
         },
         body: formData
     })
-    .then(response => {
-        if (response.ok) {
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
             console.log('Data save success');
+            sprite.userData.i = data.updatedData;
+            
             scene.remove(pointObj);
             scene.remove(infoObj);
 
-            const savedPoint = createMarker(info);
+            const savedPoint = createMarker(data.updatedData);
             markers.push(savedPoint);
 
-            if (pointerControls && pointerControls.isLocked){
+            if (pointerControls && sprite.userData.pControls){
                 pointerControls.lock();
+                sprite.userData.pControls=false;
             }
         } else {
-            alert('info save failed');
+            alert(`info save failed:${error}`);
         }
     })
     .catch(error => {
@@ -343,19 +341,24 @@ function onSaveClick(pointObj, infoObj, index, info) {
     
 }
 
-function onCancelClick(pointObj, infoObj, info) {
+function onCancelClick(sprite, infoObj) {
     infostatus = false;
     
-    // scene.remove(pointObj);
     scene.remove(infoObj);
     setScene(scene);
 
-    clickEventToSprite(createMarker(info));
-    // createMarker(info);
+
+    sprite.userData.isInfoBoxOpen = false;
+    if (sprite){
+        clickEventToSprite(sprite);
+    }
     
 
-    if (pointerControls && pointerControls.isLocked){
+    if (pointerControls && sprite.userData.pControls){
+        scene.remove(sprite);
+        setScene(scene);
         pointerControls.lock();
+        sprite.userData.pControls = false;
     }
     
 }

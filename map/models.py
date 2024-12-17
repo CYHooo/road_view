@@ -44,9 +44,9 @@ class TypeInfo(models.Model):
     south_image = models.ImageField(max_length=256, upload_to='tree/', null=True, blank=True)
     east_image = models.ImageField(max_length=256, upload_to='tree/', null=True, blank=True)
     west_image = models.ImageField(max_length=256, upload_to='tree/', null=True, blank=True)
-    x = models.FloatField()
-    y = models.FloatField()
-    z = models.FloatField()
+    x = models.DecimalField(max_digits=8, decimal_places=6)
+    y = models.DecimalField(max_digits=8, decimal_places=6)
+    z = models.DecimalField(max_digits=8, decimal_places=6)
     image_id = models.ForeignKey(PanoramaImage, on_delete=models.CASCADE, null=False, db_column='image_id')
 
     class Meta:

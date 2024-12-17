@@ -56,7 +56,8 @@ function init() {
     controls = new OrbitControls( camera, renderer.domElement );
     controls.enablePan = false;
     controls.zoomSpeed = 10;
-    controls.enableZoom = false;
+    controls.enableZoom = true;
+    controls.rotateSpeed = -0.5;
     // controls.maxDistance = 0.1;
 
     loadImage(index); // load image
@@ -91,8 +92,8 @@ function loadImage(index) {
     .then(json => {
         if (json.data) {
             const infoDatas = json.data;
-            infoDatas.forEach(info => {
-                const marker = createMarker(info);
+            infoDatas.forEach(i => {
+                const marker = createMarker(i);
                 markers.push(marker);
                 setMarkers(markers);
             });
@@ -119,14 +120,14 @@ function clearMarkers() {
 }
 
 
-function createMarker(info) {
+function createMarker(i) {
     const textureLoader = new THREE.TextureLoader();
     const iconTexture = textureLoader.load('/static/map/svg/info-circle-fill.svg');
-    const spriteMaterial = new THREE.SpriteMaterial({ map: iconTexture });
+    const spriteMaterial = new THREE.SpriteMaterial({ map: iconTexture, color: new THREE.Color("rgb(0,192,144)") });
     const sprite = new THREE.Sprite(spriteMaterial);
     sprite.scale.set(0.4,0.4,0);
-    sprite.position.set(info.position.x, info.position.y, info.position.z);
-    sprite.userData = {info};
+    sprite.position.set(i.position.x, i.position.y, i.position.z);
+    sprite.userData = {i, isInfoBoxOpen: false};
     clickEventToSprite(sprite);
     
     
@@ -151,19 +152,15 @@ function clickEventToSprite(sprite) {
             if (sprite.userData.isInfoBoxOpen) return;
 
             sprite.userData.isInfoBoxOpen = true;
-
-            const { info, } = sprite.userData;
-            showInfoBox(info, sprite);
+            showInfoBox(sprite.userData.i, sprite);
         }
     }
-    // 移除之前的事件监听器，避免重复添加
-    if (sprite.onClickHandler) {
-        window.removeEventListener('click', sprite.onClickHandler);
+    // 防止重复绑定
+    if (!sprite.userData.eventBound) {
+        window.addEventListener('click', onClick);
+        sprite.userData.eventBound = true;
+        sprite.onClickHandler = onClick;
     }
-
-    // 绑定新的事件监听器
-    sprite.onClickHandler = onClick;
-    window.addEventListener('click', sprite.onClickHandler);
 }
 
 function removeClickEventFromSprite(sprite) {
@@ -173,8 +170,6 @@ function removeClickEventFromSprite(sprite) {
 }
 
 function showInfoBox(info, sprite) {
-    
-
     const infoDiv = document.createElement('div');
     infoDiv.style.padding = '10px';
     infoDiv.style.backgroundColor = 'rgba(255, 255, 255, 0.6)';
@@ -186,19 +181,20 @@ function showInfoBox(info, sprite) {
 
     const infoForm = document.createElement('div');
     infoForm.innerHTML = createForm(info);
+
+    // 填充数据
+    Object.keys(info).forEach(key => {
+        const input = infoForm.querySelector(`#${key}`);
+        if (input) input.value = info[key];
+    });
+
     infoDiv.appendChild(infoForm);
-
-
     const infoObj = new CSS2DObject(infoDiv);
     infoObj.position.copy(sprite.position);
-
-
     scene.add(infoObj);
-    setScene(scene);
 
     requestAnimationFrame(() => {
-        initFormEvent(sprite.position, infoObj, index, info);
-        sprite.userData.showInfoBox = false;
+        initFormEvent(sprite.position, infoObj, index, sprite);
     });
 
 }
@@ -240,7 +236,7 @@ function getTexturesFromAtlasFile( imgURL, num ) {
 
 
 function createPanel() {
-    const gui = new GUI( { width: 150 });
+    gui = new GUI( { width: 150 });
     conf = {
         capture: capturePoint,
     }
@@ -277,7 +273,7 @@ function capturePoint() {
         controls.enabled = false;
         blocker.style.display = 'none'; // 隐藏 blocker
         crosshair.style.display = 'block'; // 显示十字标记
-        document.addEventListener('click', onMouseClick);
+        document.addEventListener('click', onMouseClick, {once: true});
         infostatus = false;
     });
 
@@ -286,7 +282,7 @@ function capturePoint() {
             crosshair.style.display = 'none'; // 隐藏十字标记
             controls.enabled = true; // 恢复 OrbitControls
             updateButton();
-            document.removeEventListener('click', onMouseClick);
+            document.removeEventListener('click', onMouseClick, {once: true});
         }
     });
 }
@@ -308,22 +304,18 @@ function onMouseClick() {
     // 计算点击位置（沿摄像机方向一定距离）
     const distance = 10; // 圆点离摄像机的距离
     const position = new THREE.Vector3().copy(camera.position).add(direction.multiplyScalar(distance));
-
-    const pointDiv = document.createElement('div');
-    pointDiv.innerHTML = `   
-            <i class="bi bi-info-circle-fill text-warning fs-3"></i>
-        `
-    pointDiv.style.zIndex = '10';
-    pointDiv.style.cursor = 'pointer';
-    pointDiv.style.pointerEvents = 'auto';
-
-    const pointObj = new CSS2DObject(pointDiv);
-    pointObj.position.copy(position);
     
+    const textureLoader = new THREE.TextureLoader();
+    const iconTexture = textureLoader.load('/static/map/svg/info-circle-fill.svg');
+    const spriteMaterial = new THREE.SpriteMaterial( { map: iconTexture, color: new THREE.Color("rgb(250,188,63)") } );
+    const sprite = new THREE.Sprite(spriteMaterial);
+    sprite.scale.set(0.4,0.4,0);
+    sprite.position.set(position.x, position.y, position.z);
+    sprite.userData.pControls = true;
+
 
     // 创建信息框
     const infoDiv = document.createElement('div');
-    // infoDiv.style.position = 'absolute';
     infoDiv.style.padding = '10px';
     infoDiv.style.backgroundColor = 'rgba(255, 255, 255, 0.6)';
     infoDiv.style.color = 'white';
@@ -351,18 +343,18 @@ function onMouseClick() {
     const cameraRight = new THREE.Vector3();
     cameraRight.crossVectors(cameraUp, cameraDirection).normalize();
 
-    // 设置偏移量的大小
-    const offsetDistance = -3; // 可以根据需要调整
 
     // 计算信息框的位置
     const infoPosition = new THREE.Vector3().copy(position);
-    // .add(cameraRight.multiplyScalar(offsetDistance));
     infoObj.position.copy(infoPosition);
     scene.add(infoObj);
-    scene.add(pointObj);
+    // scene.add(pointObj);
+    scene.add(sprite);
+    
     requestAnimationFrame(() => {
-        initFormEvent(pointObj, infoObj, index, info);
+        initFormEvent(sprite, infoObj, index, sprite);
     });
+
     pointerControls.unlock();
 
 }
@@ -371,15 +363,12 @@ function createButton(text, position, onClick) {
     const button = document.createElement('button');
     button.textContent = text;
     button.style.position = 'fixed';
-    button.classList = 'btn btn-outline-info';
+    button.classList = 'btn btn-outline-primary';
     button.style.width = '100px';
     button.style.height = '50px';
-    // button.style.transform = 'translateY(-50%)';
     button.style.padding = '10px';
     button.style.cursor = 'pointer';
     button.style.zIndex = 1000;
-    // button.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-    // button.style.color = 'white';
     button.style.pointerEvents = 'auto';
 
     // 根据 position 决定按钮的具体位置
@@ -401,9 +390,7 @@ function createButton(text, position, onClick) {
 
 function updateButton() {
     // 清除现有按钮
-    buttons.forEach(b => {
-        scene.remove(b);
-    });
+    document.querySelectorAll('.btn').forEach(btn => btn.remove());
     buttons.length = 0;
 
     if (index > 0) {
@@ -477,4 +464,4 @@ function animate() {
     labelRenderer.render(scene, camera);
 }
 
-export { createMarker, clickEventToSprite, clearMarkers }
+export { createMarker, clickEventToSprite, clearMarkers, loadImage };
