@@ -211,6 +211,10 @@ function createForm(infoDatas=null) {
     return formHTML;
 }
 
+/**
+ * `save` && `cancel` button event and upload img event
+ * @callback => `save` && `cancel` && `img-container` click event
+ */
 function initFormEvent(pointObj, infoObj, index, sprite) {
     const placeholder = document.querySelectorAll('.img-placeholder');
     const saveButton = document.getElementById('save-btn');
@@ -226,6 +230,9 @@ function initFormEvent(pointObj, infoObj, index, sprite) {
     cancelButton.addEventListener('click', () => onCancelClick(sprite, infoObj));
 }
 
+/**
+ * for `click` img-container upload imgs
+ */
 function clickForUploadImage(p) {
     const imgPosition = p.getAttribute('data-image-id');
     const fileInput = document.createElement('input');
@@ -258,8 +265,11 @@ function clickForUploadImage(p) {
     document.body.removeChild(fileInput);
 }
 
+/**
+ * button `click` event
+ */
 function onSaveClick(pointObj, infoObj, index, sprite) {
-    infostatus = false;
+    infostatus = false; // renturn from mouse control
     
     const fields = [
         'address',
@@ -277,15 +287,17 @@ function onSaveClick(pointObj, infoObj, index, sprite) {
     const formData = new FormData();
 
     // 使用循环获取表单值
+    // get input values
     fields.forEach(field => {
         const input = infoObj.element.querySelector(`#${field}`);
         if (input) {
             data[field] = input.value;
         } else {
-            data[field] = ""; // 如果不存在对应元素，可设为空或根据需求处理
+            data[field] = ""; // 如果不存在对应元素，可设为空或根据需求处理. if value == None => value == ""
         }
     });
 
+    // sprite position(xyz)
     data.position = {
         x: pointObj?.position?.x ?? pointObj.x,
         y: pointObj?.position?.y ?? pointObj.y,
@@ -293,6 +305,7 @@ function onSaveClick(pointObj, infoObj, index, sprite) {
     };
     data.imageId = images[index].id;
 
+    // input values => json format
     for (const [key, value] of Object.entries(data)) {
         if (typeof value === 'object') {
             formData.append(key, JSON.stringify(value));
@@ -320,13 +333,17 @@ function onSaveClick(pointObj, infoObj, index, sprite) {
         if (data.success) {
             console.log('Data save success');
             sprite.userData.i = data.updatedData;
-            
+
+            // init sence window
             scene.remove(pointObj);
             scene.remove(infoObj);
 
             const savedPoint = createMarker(data.updatedData);
             markers.push(savedPoint);
 
+            // check pointerLockControl mode
+            // if control from <capture> => pointerControls.lock()
+            // if control from <OrbitControls> => return
             if (pointerControls && sprite.userData.pControls){
                 pointerControls.lock();
                 sprite.userData.pControls=false;
@@ -344,16 +361,20 @@ function onSaveClick(pointObj, infoObj, index, sprite) {
 function onCancelClick(sprite, infoObj) {
     infostatus = false;
     
+    // init sence, remove point-div && info-div
     scene.remove(infoObj);
     setScene(scene);
 
-
+    // init sprite info-div status
     sprite.userData.isInfoBoxOpen = false;
+    // check info-div open from <sprite> or <capture mode>
     if (sprite){
         clickEventToSprite(sprite);
     }
     
-
+    // for check control mode from <caputre> or not
+    // if control from <capture> => init sence
+    // if from <sprite> => return
     if (pointerControls && sprite.userData.pControls){
         scene.remove(sprite);
         setScene(scene);

@@ -14,7 +14,8 @@ import json
 import base64
 from .form import TreeInfoForm
 import decimal
-
+import ffmpeg
+from datetime import datetime
 # Create your views here.
 
 def index(request):
@@ -37,7 +38,7 @@ def index(request):
                 face_w = w // 6
                 face_h = h
 
-                interface = image[:, face_w * 4 : face_w * 5]
+                interface = image[:, face_w * 4 : face_w * 5] ## get cube image's <front-face> range
                 _, buffer = cv2.imencode('.jpg', interface)
                 img_base64 = base64.b64encode(buffer).decode('utf-8')
                 img_data = f"data:image/jpeg;base64,{img_base64}"
@@ -90,11 +91,11 @@ def panorama_to_cubemap(image, cube_width, cube_height):
             6 cube mapping dictionary
     """
     # cube direction
-    # left,right,up,down,front,back
+    # right,left,up,down,front,back
 
     directions = {
-        "r": np.array([1, 0, 0]), # X-
-        "l": np.array([-1, 0, 0]),  # X+
+        "r": np.array([1, 0, 0]),  # X+
+        "l": np.array([-1, 0, 0]), # X-
         "u": np.array([0, 1, 0]),  # Y+
         "d": np.array([0, -1, 0]), # Y-
         "f": np.array([0, 0, 1]),  # Z+
@@ -110,7 +111,7 @@ def panorama_to_cubemap(image, cube_width, cube_height):
         face = render_cubemap_face(image, w, h, cube_width, cube_height, direction)
         cubemap_faces.append(face)
     
-    # stack image in one line: left, right, up, down, left, right
+    # stack image in one line: right, left, up, down, front, back
     stack_image = np.hstack(cubemap_faces)
     
     return stack_image
@@ -165,6 +166,7 @@ def render_cubemap_face(image, width, height, cube_width, cube_height, direction
         interpolation=cv2.INTER_LINEAR,
         borderMode=cv2.BORDER_WRAP
     )
+    ## rotate up && down image for threejs stack
     if direction[1] == 1:  # Up
         face = cv2.rotate(face, cv2.ROTATE_90_COUNTERCLOCKWISE)  # 顺时针旋转 90 度
     elif direction[1] == -1:  # Down
@@ -186,11 +188,15 @@ def crop_frame_to_img(video_obj, interval=3):
     '''
     # read video file
     video_path = video_obj.video.path
+
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         print('can not open video file')
         return 406
     
+    cap_time = ffmpeg.probe(video_path)['format']['tags']['comment']
+    init_time = datetime.strptime(cap_time, '%Y-%m-%d %H:%M:%S +0000') ## video start record time tz=KR
+
     # get video frame info
     fps = cap.get(cv2.CAP_PROP_FPS)
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
