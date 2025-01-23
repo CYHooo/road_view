@@ -34,4 +34,3 @@ class TreeInfoForm(forms.Form):
                 data[key] = value
 
         return data
-

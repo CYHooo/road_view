@@ -6,6 +6,7 @@ class PanoramaVideo(models.Model):
     id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=256)
     datetime = models.DateField(auto_now=True)
+    origintime = models.IntegerField()
     video = models.FileField(max_length=256, upload_to='video/', null=True, blank=True)
     
 

@@ -5,7 +5,7 @@
  * Data include tree info && work images.
 */
 import { scene, pointerControls, markers, setScene } from './param.js';
-import { createMarker, clickEventToSprite, clearMarkers, loadImage } from './view.js';
+import { createMarker, clickEventToSprite, clearMarkers, loadImage, isMobileDevice } from './view.js';
 
 let selectedImages = {}; // 用于保存用户选择但尚未提交的图片文件
 let infostatus = true;
@@ -19,7 +19,7 @@ function createForm(infoDatas=null) {
     // 创建一个包含表单布局的 HTML 字符串
     const formHTML = `
         
-        <div class="container">
+        <div class="container-md">
             <form class="border border-2 border-dark rounded-3 p-2 mb-3">
                 <!-- 第一行、第二行与右侧"수목 No.(측점 수)"对齐 -->
                 <div class="row text-dark text-center g-1 mb-1">
@@ -263,6 +263,7 @@ function clickForUploadImage(p) {
     document.body.appendChild(fileInput);
     fileInput.click();
     document.body.removeChild(fileInput);
+    // return selectedImages;
 }
 
 /**
@@ -340,7 +341,7 @@ function onSaveClick(pointObj, infoObj, index, sprite) {
 
             const savedPoint = createMarker(data.updatedData);
             markers.push(savedPoint);
-
+            selectedImages = {};
             // check pointerLockControl mode
             // if control from <capture> => pointerControls.lock()
             // if control from <OrbitControls> => return
@@ -378,7 +379,16 @@ function onCancelClick(sprite, infoObj) {
     if (pointerControls && sprite.userData.pControls){
         scene.remove(sprite);
         setScene(scene);
-        pointerControls.lock();
+        if (!isMobileDevice()){
+            pointerControls.lock();
+        }
+        if (isMobileDevice()){
+            const crosshair = document.getElementById('crosshair');
+            const mobileCancelBtn = document.getElementById('mobileCancelBtn');
+            if (mobileCancelBtn) {
+                crosshair.style.display = 'block';
+            }
+        }
         sprite.userData.pControls = false;
     }
     

@@ -21,7 +21,29 @@ let csrftoken;
 let markers = [];
 const buttons = [];
 const tweenGroup = new Group();
+let mobileCaptureBtn;
 
+// 检查设备是否移动设备
+function isMobileDevice() {
+    // 触屏检测
+    const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    if (!hasTouch) return false;
+
+    // 交互方式
+    const isCoarsePointer = window.matchMedia('(pointer: coarse)').matches;
+    const hasMouse = window.matchMedia('(any-hover: hover)').matches;
+  
+    // 综合判断
+    return (
+      !hasMouse || isCoarsePointer
+    );
+}
+
+console.log({
+    hasTouch: 'ontouchstart' in window || navigator.maxTouchPoints > 0,
+    hasMouse: window.matchMedia('(any-hover: hover)').matches,
+    isMobile: isMobileDevice()
+});
 
 init();
 
@@ -262,10 +284,67 @@ function capturePoint() {
 
     pointerControls = new PointerLockControls(camera, renderer.domElement);
     setPointerConctrols(pointerControls);
-    // 点击 info 启动 PointerLockControls
-    info.addEventListener('click', function () {
-        pointerControls.lock();
-    });
+    let mobileEvent;
+
+    if (isMobileDevice()){
+        // 点击 info 启动 PointerLockControls
+        mobileEvent = function (e) {
+            e.preventDefault();
+            blocker.style.display = 'none'; // 隐藏 blocker
+            crosshair.style.display = 'block'; // 显示十字标记
+
+            const mobileCaptureBtn = document.createElement('div');
+            mobileCaptureBtn.id = 'mobileCaptureBtn';
+            mobileCaptureBtn.innerHTML = '<i class="bi bi-camera"></i>';
+            mobileCaptureBtn.style.position = 'fixed';
+            mobileCaptureBtn.style.bottom = '10px';
+            mobileCaptureBtn.style.left = '70%';
+            mobileCaptureBtn.style.width = '150px';
+            mobileCaptureBtn.style.height = '150px';
+            mobileCaptureBtn.style.backgroundColor = 'rgba(0,0,0,0.5)';
+            mobileCaptureBtn.style.color = 'white';
+            mobileCaptureBtn.style.borderRadius = '50%';
+            mobileCaptureBtn.style.fontSize = '50px';
+            mobileCaptureBtn.style.display = 'flex';
+            mobileCaptureBtn.style.justifyContent = 'center';
+            mobileCaptureBtn.style.alignItems = 'center';
+            mobileCaptureBtn.style.cursor = 'pointer';
+            mobileCaptureBtn.style.zIndex = '5';
+            mobileCaptureBtn.style.pointerEvents = 'auto';
+            mobileCaptureBtn.addEventListener('click', onMouseClick);
+
+            const mobileCancelBtn = document.createElement('div');
+            mobileCancelBtn.id = 'mobileCancelBtn';
+            mobileCancelBtn.innerHTML = '<i class="bi bi-box-arrow-left"></i>';
+            mobileCancelBtn.style.position = 'fixed';
+            mobileCancelBtn.style.top = '10px';
+            mobileCancelBtn.style.left = '0%';
+            mobileCancelBtn.style.transform = 'translateX(50%)';
+            mobileCancelBtn.style.width = '100px';
+            mobileCancelBtn.style.height = '100px';
+            // mobileCancelBtn.style.backgroundColor = 'rgba(0,0,0,0.5)';
+            mobileCancelBtn.style.color = 'white';
+            mobileCancelBtn.style.borderRadius = '50%';
+            mobileCancelBtn.style.fontSize = '50px';
+            mobileCancelBtn.style.display = 'flex';
+            mobileCancelBtn.style.justifyContent = 'center';
+            mobileCancelBtn.style.alignItems = 'center';
+            mobileCancelBtn.style.cursor = 'pointer';
+            mobileCancelBtn.style.zIndex = '5';
+            mobileCancelBtn.style.pointerEvents = 'auto';
+            mobileCancelBtn.addEventListener('click', onMobileCancel);
+            document.body.appendChild(mobileCaptureBtn);
+            document.body.appendChild(mobileCancelBtn);
+
+            info.removeEventListener('touchstart', mobileEvent);
+        };
+        info.addEventListener('touchstart', mobileEvent, {once: true});
+    } else {
+        // 点击 info 启动 PointerLockControls
+        info.addEventListener('click', function () {
+            pointerControls.lock();
+        });
+    }
 
     // 监听 PointerLockControls 的 lock 和 unlock 事件
     pointerControls.addEventListener('lock', function () {
@@ -287,7 +366,18 @@ function capturePoint() {
     });
 }
 
+function onMobileCancel() {
+    crosshair.style.display = 'none';
+    document.getElementById('mobileCaptureBtn').remove();
+    document.getElementById('mobileCancelBtn').remove();
+}
+
 function onMouseClick() {
+    if (isMobileDevice()) {
+        document.getElementById('mobileCaptureBtn').remove();
+        document.getElementById('mobileCancelBtn').remove();
+    }
+
     buttons.forEach(b => {
         scene.remove(b);
     });
@@ -464,4 +554,4 @@ function animate() {
     labelRenderer.render(scene, camera);
 }
 
-export { createMarker, clickEventToSprite, clearMarkers, loadImage };
+export { createMarker, clickEventToSprite, clearMarkers, loadImage, isMobileDevice };

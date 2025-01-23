@@ -16,6 +16,7 @@ from .form import TreeInfoForm
 import decimal
 import ffmpeg
 from datetime import datetime
+
 # Create your views here.
 
 def index(request):
@@ -267,19 +268,25 @@ def videoupload(request):
 
         if current_size >= total_size:
             try:
+                capture_time = ffmpeg.probe(temp_file).get("format",{}).get("tags",{}).get("comment")
+                timestamp = int(datetime.strptime(capture_time, '%Y-%m-%d %H:%M:%S %z').timestamp())
+                if not capture_time or not timestamp:
+                    return JsonResponse({'message': 'can not get video capture time'}, status=406)
+                
                 video_obj = PanoramaVideo.objects.create(
                     name=os.path.basename(temp_file),
                     video=os.path.relpath(temp_file, settings.MEDIA_ROOT),
+                    origintime=timestamp
                 )
 
                 #  make video path: '/media/video/{video_id}'
-                video_folder = os.path.join(settings.MEDIA_ROOT, 'video', str(video_obj.id)) 
+                video_folder = os.path.join(settings.MEDIA_ROOT, 'video', str(video_obj.id))
                 os.makedirs(video_folder,exist_ok=True)
 
                 # clean && move temp file to '/media/video/{video_id}'
                 source_file = os.path.join(video_folder, filename)
                 os.rename(temp_file, source_file)
-                
+
                 # update video model
                 video_obj.video = os.path.relpath(source_file, settings.MEDIA_ROOT)
                 video_obj.save()
@@ -369,9 +376,7 @@ def form_update(request):
                 for form_field, model_field, prefix in image_fields:
                     file_obj = data.get(form_field)
                     if file_obj:
-                        # 构建相对路径
                         relative_path = f"{data['imageId']}/{prefix}_{file_obj.name}"
-                        # 保存文件
                         getattr(form_obj, model_field).save(relative_path, file_obj, save=True)
                 return JsonResponse({
                             'success': True,
