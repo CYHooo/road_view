@@ -12,18 +12,16 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 
 from pathlib import Path
 import os
-import environ
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-env = environ.Env(DEBUG=(bool, False))
-environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
+import my_settings
+SECRET_KEY = my_settings.SECRET_KEY
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-v1q4me==@piozx94wy2ty^w*i#2kgn+_6u61=af#vl#$zo)9!6'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -42,12 +40,14 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django.contrib.sites',
     'map',
-    
-    'user',
-    'allauth',
-    'allauth.account',
-    
+    "widget_tweaks",
 
+    # 'user',
+    "accounts",
+    # 'allauth',
+    # 'allauth.account',
+    'home',   
+    
 ]
 SITE_ID = 1
 
@@ -60,9 +60,12 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 
-    "allauth.account.middleware.AccountMiddleware",
+    # "allauth.account.middleware.AccountMiddleware",
+    'accounts.middleware.PasswordExpirationMiddleware',
+
 ]
 
+AUTH_USER_MODEL = 'accounts.CustomUser'
 ROOT_URLCONF = 'view_3d.urls'
 
 TEMPLATES = [
@@ -87,16 +90,7 @@ WSGI_APPLICATION = 'view_3d.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
-DATABASES = {
-    'default':{
-        "ENGINE": "django.db.backends.mysql",
-        "NAME": env("DB_NAME"),
-        "USER": env("DB_USER"),
-        "PASSWORD": env("DB_PASSWORD"),
-        "HOST": env("DB_HOST"),
-        "PORT": env("DB_PORT"),
-        }
-}
+DATABASES = my_settings.DATABASES
 
 
 # Password validation
@@ -107,13 +101,20 @@ AUTH_PASSWORD_VALIDATORS = [
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+        "OPTIONS": {
+            'min_length': 10,
+        }
     },
+
     {
         'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
     },
     {
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+    },
+        {
+        "NAME": "accounts.validators.CustomPasswordValidator",
     },
 ]
 
@@ -122,9 +123,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.0/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'ko-kr'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = "Asia/Seoul"
 
 USE_I18N = True
 
@@ -142,25 +143,24 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-AUTH_USER_MODEL = "user.User"
 
 # auth setting 
 # Reference: https://docs.allauth.org/en/latest/installation/quickstart.html
 
 
 
-AUTHENTICATION_BACKENDS = [
-    'django.contrib.auth.backends.ModelBackend',  # 默认后端
-    'allauth.account.auth_backends.AuthenticationBackend',  # allauth 后端
-]
-ACCOUNT_LOGOUT_ON_GET = True
-ACCOUNT_SIGNUP_FORM_CLASS = "user.forms.SignupForm"
+# AUTHENTICATION_BACKENDS = [
+#     'django.contrib.auth.backends.ModelBackend',  # 默认后端
+#     'allauth.account.auth_backends.AuthenticationBackend',  # allauth 后端
+# ]
+# ACCOUNT_LOGOUT_ON_GET = True
+# ACCOUNT_SIGNUP_FORM_CLASS = "user.forms.SignupForm"
 
-ACCOUNT_EMAIL_REQUIRED = False                     # 必须提供电子邮件
-ACCOUNT_USERNAME_REQUIRED = True                  # 必须提供用户名
-ACCOUNT_EMAIL_VERIFICATION = 'none'          # 可选邮箱验证 ('mandatory', 'optional', 'none')
+# ACCOUNT_EMAIL_REQUIRED = False                     # 必须提供电子邮件
+# ACCOUNT_USERNAME_REQUIRED = True                  # 必须提供用户名
+# ACCOUNT_EMAIL_VERIFICATION = 'none'          # 可选邮箱验证 ('mandatory', 'optional', 'none')
                  
-ACCOUNT_LOGOUT_REDIRECT_URL = '/'                 # 登出后的重定向 URL
-LOGIN_REDIRECT_URL = '/'                        # 登录成功后的重定向 URL
-ACCOUNT_SIGNUP_REDIRECT_URL = 'account_login'
+# ACCOUNT_LOGOUT_REDIRECT_URL = '/'                 # 登出后的重定向 URL
+# LOGIN_REDIRECT_URL = '/'                        # 登录成功后的重定向 URL
+# ACCOUNT_SIGNUP_REDIRECT_URL = 'account_login'
 

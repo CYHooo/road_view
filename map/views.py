@@ -18,6 +18,10 @@ import ffmpeg
 from datetime import datetime
 # Create your views here.
 
+def dashboard(request):
+    return render(request, 'map/dashboard.html')
+
+
 def index(request):
     # 查询所有视频对象
     videos = PanoramaVideo.objects.all()
@@ -194,8 +198,8 @@ def crop_frame_to_img(video_obj, interval=3):
         print('can not open video file')
         return 406
     
-    cap_time = ffmpeg.probe(video_path)['format']['tags']['comment']
-    init_time = datetime.strptime(cap_time, '%Y-%m-%d %H:%M:%S +0000') ## video start record time tz=KR
+    # cap_time = ffmpeg.probe(video_path)['format']['tags']['comment']
+    # init_time = datetime.strptime(cap_time, '%Y-%m-%d %H:%M:%S +0000') ## video start record time tz=KR
 
     # get video frame info
     fps = cap.get(cv2.CAP_PROP_FPS)
