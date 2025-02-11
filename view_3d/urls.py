@@ -18,14 +18,22 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf.urls.static import static
 from django.conf import settings
+from accounts.admin import CustomUserAdmin
+
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    path('', include('map.urls')),
-    path('accounts/', include('allauth.urls')),
+    # path('admin/', admin.site.urls),
+    path("admin/", admin.site.urls),
+    path('admin/unlock-account/<int:user_id>/', CustomUserAdmin.unlock_account, name='unlock_account'),
+
+    path('', include('home.urls')),
+    path('main/', include('map.urls')),
+    
+    path('accounts/', include('accounts.urls')),
     
 ]
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
+# Asdf858512@@

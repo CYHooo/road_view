@@ -1,0 +1,138 @@
+{% extends './base.html' %}
+{% load widget_tweaks %}
+{% load static %}
+{% block title %}Upload{% endblock %}
+{% block style %}
+    <style>
+        .video-title {
+            color: #2c3e50;
+            font-weight: 300;
+            font-size: 2.2rem;
+            letter-spacing: -0.5px;
+            margin-bottom: 2rem;
+            position: relative;
+            padding-bottom: 0.5rem;
+        }
+        .video-body {
+            display: flex;                /* 启用 Flex 布局 */
+            justify-content: top;      /* 水平居中 */
+            align-items: center;          /* 垂直居中 */
+            min-height: 80vh;             /* 最小高度，确保在小屏幕也能居中 */
+            box-sizing: border-box;       /* 让 padding 不影响宽度计算 */
+            flex-direction: column;       /* 保证子元素垂直排列 */
+            width:100%;
+            padding: 20px;
+        }
+
+        .drop-box {
+            background: rgba(255, 255, 255, 0.4);
+            border: 3px dashed #bdc3c7 !important;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+            border: 3px dashed gray;
+            border-radius: 30px;
+            text-align: center; 
+            display: block;
+            cursor: pointer;
+        }
+        .drop-box:hover {
+            background: rgba(255, 255, 255, 0.7);
+            border: 3px solid rgba(0,0,0,0.7)  !important;
+            box-shadow: 1px 1px 5px 5px rgba(20, 20, 20, 0.1);
+        }
+        .drop-box:hover .text-box {
+            color: rgba(0,0,0,0.7) !important;
+        }
+
+        /* 删除动画 */
+        .delete-animation {
+            animation: deleteSlide 1s ease-out;
+        }
+        @keyframes deleteSlide {
+            from {
+                opacity: 1;
+            }
+            to {
+                opacity: 0;
+                transform: translateX(80%);
+            }
+        }
+    </style>
+{% endblock %}
+{% block content %}
+    <div class="d-flex justify-content-center align-items-center mb-1 mt-3">
+        <div class="video-title" id="videoUpload">Panorama Video Upload
+            <hr class="border border-primary border-1 opacity-70">
+        </div>
+    </div>
+    <div class="video-body">
+        <div class="row" style="width: 80%;">
+            <div id="fileListContainer" class="d-flex justify-content-center align-items-center mb-5 mt-3" style="height:300px;">
+                <!-- File List -->
+                <div id="fileList" style="width: 80%; height: 100%; 
+                                            box-shadow:1px 1px 3px 3px rgba(0,0,0,0.1); 
+                                            /* border-radius:30px; */
+                                            text-align: center;
+                                            display: none;">
+                </div>
+
+                <!-- Drop Box -->
+                <div class="drop-box" id="dropbox">
+                    <div class="d-flex justify-content-center align-items-center" style="height: 100%;">
+                        <p class="text-box" style="font-size: 24px; color: gray;">
+                            <i class="bi bi-filetype-mp4" style="font-size: 5rem;"></i><br>
+                            <i class="fa-solid fa-arrow-pointer fs-6"></i> Click or <i class="fa-solid fa-file-arrow-up fs-6"></i> Drop to Upload File
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <form id="videoForm" data-url="{% url 'videoupload' %}" method="post" enctype="multipart/form-data">
+                {% csrf_token%}
+                <!-- folder select -->
+                <div class="row">
+                    <input type="file" name="files" id="files" style="display: none;" accept=".mp4" multiple>
+                    <!-- <div class="col-12 d-flex justify-content-center align-items-center"> -->
+                    <!-- <div class="d-grid gap-3 d-md-flex justify-content-center">
+                        <input type="file" name="files" id="files" style="display: none;" accept=".mp4" multiple>
+                        <label for="files" class="btn btn-outline-primary btn-lg mb-3 me-3">Upload Files</label>
+                        <input type="file" name="folder" id="folder" style="display: none;" webkitdirectory="">
+                        <label for="folder" class="btn btn-outline-primary btn-lg mb-3 ms-3">Upload Folder</label>
+                    </div> -->
+                    <!-- files list -->
+                    <!-- <div id="fileList" class="mb-3 col-12 d-flex justify-content-center align-items-center"></div> -->
+
+                    <div class="video-footer d-grid gap-2 mx-auto col-4">
+                        <button id="videoSubmit" type="submit" class="btn btn-primary btn-lg">submit</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+    <script>
+        window.addEventListener('drop', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+        window.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+        window.addEventListener('dragenter', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+        window.addEventListener('dragend', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+    </script>
+    <script src="{% static 'map/js/upload.js' %}"></script>
+    
+{% endblock %}

@@ -5,8 +5,59 @@
  * Data include tree info && work images.
 */
 import { scene, pointerControls, markers, setScene } from './param.js';
-import { createMarker, clickEventToSprite, clearMarkers, loadImage, isMobileDevice } from './view.js';
+import { createMarker, clickEventToSprite, clearMarkers, loadImage } from './view.js';
+// CSS 스타일을 JavaScript 문자열로 정의
+const styles = `
+<style>
+    .tree-form-container {
+        background-color: rgba(255, 255, 255, 0.95);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        border-radius: 8px;
+        padding: 20px;
+    }
 
+    .input-group-text {
+        min-width: 80px;
+        justify-content: center;
+    }
+
+    .img-placeholder {
+        transition: all 0.3s ease;
+        background-color: rgba(0, 0, 0, 0.02);
+    }
+
+    .img-placeholder:hover {
+        background-color: rgba(0, 0, 0, 0.05);
+        cursor: pointer;
+    }
+
+    .img-thumbnail {
+        transition: transform 0.2s ease;
+    }
+
+    .tree-form-title {
+        font-size: 1.2rem;
+        font-weight: bold;
+        margin-bottom: 1rem;
+        color: #2c3e50;
+    }
+
+
+    .photo-section {
+        background-color: rgba(0, 0, 0, 0.02);
+        border-radius: 8px;
+        padding: 10px;
+    }
+
+    .direction-label {
+        font-weight: bold;
+        background-color: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+    }
+</style>
+`;
 let selectedImages = {}; // 用于保存用户选择但尚未提交的图片文件
 let infostatus = true;
 
@@ -18,8 +69,9 @@ let infostatus = true;
 function createForm(infoDatas=null) {
     // 创建一个包含表单布局的 HTML 字符串
     const formHTML = `
-        
-        <div class="container-md">
+        ${styles}
+
+        <div class="container-sm">
             <form class="border border-2 border-dark rounded-3 p-2 mb-3">
                 <!-- 第一行、第二行与右侧"수목 No.(측점 수)"对齐 -->
                 <div class="row text-dark text-center g-1 mb-1">
@@ -198,7 +250,7 @@ function createForm(infoDatas=null) {
                 </div>  
             </form>
             <div id="btn-group" class="d-grid gap-2 d-md-flex justify-content-md-end mb-3">
-                <button id="save-btn" type="submit" class="btn btn-primary me-md-2">
+                <button id="save-btn" type="submit" class="btn btn-primary me-md-2 ">
                     저장
                 </button>
                 <button id="cancel-btn" type="close" class="btn btn-secondary">
@@ -322,7 +374,7 @@ function onSaveClick(pointObj, infoObj, index, sprite) {
     // scene.remove(infoObj);
     const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
 
-    fetch('/form_update/', {
+    fetch('/main/form_update/', {
         method: 'POST',
         headers: {
             'X-CSRFToken': csrftoken,

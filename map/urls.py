@@ -3,14 +3,23 @@ from . import views
 
 
 urlpatterns = [
-    path('', views.index, name='index'),
+    ## .com/main/~ ##
+
+    ## .com/main/dashboard/
+    path('dashboard/', views.dashboard, name="dashboard"),
     
     # video upload
-    path('videoupload/', views.videoupload, name="videoupload"),
+    ## .com/main/videoupload_index/
+    path('videoupload_index/', views.videoupload_index, name="videoupload_index"),
     
+    path('videoupload/', views.videoupload, name="videoupload"),
+
+
     # 3d view image, 
-    # 'com/view/{video_id}'
-    path('view/<int:video_id>', views.view, name='view'),
+    ## .com/main/parnorma_index/
+    path('parnorma_index/', views.panorama_index, name='panorama_index'),
+    path('panorama/<int:video_id>/', views.panorama, name='panorama'),
+    # path('view/<int:video_id>', views.view, name='view'),
 
     # tree info form && position data, 
     # 'com/info_position?image_id={img_id}'

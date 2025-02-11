@@ -1,0 +1,177 @@
+{% extends './base.html' %}
+{% load widget_tweaks %}
+{% load static %}
+{% block title %}Panorama{% endblock %}
+{% block style %}
+    <style>
+        .panorama-box {
+            width: 100%;
+            height: 100vh;
+        }
+        .panorama-title {
+            color: #2c3e50;
+            font-weight: 300;
+            font-size: 2.2rem;
+            letter-spacing: -0.5px;
+            margin-bottom: 2rem;
+            position: relative;
+            padding-bottom: 0.5rem;
+        }
+
+        #panorama-viewer {
+            width: 100%;
+            height: 100vh;
+            overflow: hidden;
+            position: relative;
+        }
+        img:hover{
+            border: lightcoral 5px solid;
+        }
+        #blocker {
+            color: white;
+            display: none;
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            z-index: 15;
+        }
+
+        #info {
+            width: 100%;
+            height: 100%;
+
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+
+            color: white;
+            text-align: left;
+            font-size: 24px;
+            cursor: pointer;
+        }
+        #crosshair {
+            display: none; 
+            position: absolute; 
+            top: 50%; 
+            left: 50%; 
+            transform: translate(-50%, -50%); 
+            font-size: 36px;
+            color: red;
+            z-index: 9999;
+        }
+        canvas {
+            height:100% !important;
+            width:100% !important;
+        }
+
+    </style>
+    <!-- three js import map -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "{% static 'map/build/three.module.js' %}",
+                "three/addons/": "{% static 'map/examples/jsm/' %}",
+                "@tweenjs/tween.js": "{% static 'map/examples/jsm/libs/tween.esm.js' %}"
+            }
+        }
+    </script>
+{% endblock %}
+
+{% block content %}
+    {% if images %} <!-- image check -->
+        <script>
+            const images = {{ images|safe }};
+        </script>
+        <!-- panorama view container -->
+        <div id="panorama-viewer">
+            <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+
+            <div id="blocker">
+                <div id="info">
+                    <p style="font-size:42px">
+                        Click to Start<br>
+                    </p>
+                    <p>
+                        View: Mouse<br>
+                        Check: Click<br>
+                        ESC: Cancel
+                    </p>
+                </div>
+            </div>
+
+            <div id="crosshair">
+                <!-- <i class="bi bi-crosshair"></i> -->
+                <i class="bi bi-plus-lg"></i>
+
+            </div>
+            <div id="container" style="width: 100%; height: 100%;"></div>
+        </div>
+    {% else %}
+        <!-- panorama preview container -->
+        <div id="panorama-index" class="d-flex justify-content-center align-items-center mb-1 mt-3">
+            <div class="panorama-title" id="panorama-title">Panorama Check
+                <hr class="border border-primary border-1 opacity-70">
+            </div>
+        </div>
+        <div id="panoramabox" class="row row-cols-2 row-cols-lg-3 g-2 g-lg-3 justify-content-center panorama-box"
+                style="overflow-y: auto; max-height: 80vh;">
+        </div>
+    {% endif %}
+{% endblock %}
+
+{% block extra_js %}
+    <!-- panorama view script -->
+    
+    <script>
+        datas = {{ data|safe }};
+
+        if (Array.isArray(datas)) {
+            const panoramaContainer = document.getElementById('panoramabox');
+            panoramaContainer.innerHTML = '';
+
+            
+            if (datas.length === 0) {
+                console.log('No data');
+                panoramaContainer.innerHTML = `
+                        <div class="text-center mx-auto p-2 mt-5">
+                            <img src='/static/map/img/questionmark.png' style='width:300px;' class="rounded"/>
+                            <p class="text-secondary"><strong>Please Upload 360 Panorama Video First</strong></p>
+                        </div>
+                    `;
+            } else {
+                for (let i=0; i<datas.length; i++) {
+                    const data = datas[i];
+                    const imgDiv = document.createElement('div');
+                    imgDiv.classList.add('col','mb-3','ms-3',);
+                    imgDiv.style.width = '200px';
+                    imgDiv.style.height = '200px';
+                    const anchor = document.createElement('a');
+                    anchor.href = `/main/panorama/${data.video_id}`;
+
+                    const img = document.createElement('img');
+                    img.classList.add('mb-3','rounded-3','img-focus');
+                    img.src = data.first_image;
+                    img.style.width ='100%';
+                    img.style.height ='100%';
+                    anchor.appendChild(img);
+                    imgDiv.appendChild(anchor);
+                    panoramaContainer.appendChild(imgDiv);
+                }
+            }
+        }
+    </script>
+    
+    
+    <!-- <script type="module" src="{% static 'map/js/view.js' %}"></script> -->
+    <script>
+        if (document.getElementById('container') !== null) {
+            const script = document.createElement('script');
+            script.type = 'module';
+            script.src = "{% static 'map/js/view.js' %}";
+            document.body.appendChild(script);
+        }
+    </script>
+    
+{% endblock %}

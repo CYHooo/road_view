@@ -1,31 +1,25 @@
+// init param
+let dropFiles = [];
+
 // 获取dropbox元素
 const dropbox = document.getElementById('dropbox');
 const videoUploadModal = document.getElementById('videoUploadModal');
-const folderInput = document.getElementById('folder');
+const filesInput = document.getElementById('files');
 const fileListContainer = document.getElementById('fileList');
 
-// 通用阻止浏览器默认行为的函数
-function preventDefaults(e) {
-    e.preventDefault();
-    e.stopPropagation();
-}
-
-// 添加拖拽事件监听器
-['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-    document.addEventListener(eventName, preventDefaults, false);
-});
-
-['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-    dropbox.addEventListener(eventName, function (e) {
-        e.preventDefault();  // 必须阻止默认行为
-        e.stopPropagation(); // 必须阻止事件冒泡
-    });
+['dragenter', 'dragover', 'dragleave', 'dragstart', 'dragend', 'drop'].forEach(eventName => {
+    if (dropbox) {
+        dropbox.addEventListener(eventName, function (e) {
+            e.preventDefault();  // 必须阻止默认行为
+        });
+    }
 });
 
 // 拖拽文件进入时的样式
 dropbox.addEventListener('dragover', function () {
-    this.style.background = 'rgba(227, 247, 254, 0.6)';
-    this.style.border = '3px dashed rgba(0,0,0, 0.7)';
+    this.style.background = 'rgba(255,255,255, 1.0)';
+    this.style.border = '3px dashed black';
+    this.style.boxShadow = '3px 3px 5px 7px rgba(0,0,0,0.1)';
     this.style.borderRadius = "30px";
     this.innerHTML = `<div class="d-flex justify-content-center align-items-center" style="height: 100%;">
                         <p style="font-size: 24px; color: gray;">
@@ -37,10 +31,10 @@ dropbox.addEventListener('dragover', function () {
 
 // 拖拽文件离开时的样式
 dropbox.addEventListener('dragleave', function (e) {
-    // e.stopPropagation(); // 阻止冒泡
     e.preventDefault();
     this.style.background = '';
     this.style.border = '3px dashed gray';
+    this.style.boxShadow = '0px 0px 0px 0px rgba(0,0,0,0)';
     this.style.borderRadius = "30px";
     this.innerHTML = `<div class="d-flex justify-content-center align-items-center" style="height: 100%;">
                         <p style="font-size: 24px; color: gray;">
@@ -53,7 +47,7 @@ dropbox.addEventListener('dragleave', function (e) {
 // 文件被放下时处理文件
 dropbox.addEventListener('drop', function (e) {
     e.preventDefault();
-    e.stopPropagation(); // 阻止冒泡
+
     const items = e.dataTransfer.items;
     const promises = [];
 
@@ -71,22 +65,40 @@ dropbox.addEventListener('drop', function (e) {
         Promise.all(promises).then(results => {
             const files = results.flat(Infinity);
             if (files.length > 0) {
-                updateFileList(files);
+                dropFiles = [...dropFiles, ...files];
+                updateFileList(dropFiles);
+                this.style.display = 'none';
+                fileListContainer.style.display = 'block';
             } else {
-                alert('未找到任何 .mp4 文件');
+                alert('Not Found *.mp4 Files.');
             }
         });
     }
-    
-    this.style.background = '';
-    this.style.border = '3px dashed gray';
-    this.style.borderRadius = "30px";
-    this.innerHTML = `<div class="d-flex justify-content-center align-items-center" style="height: 100%;">
-                        <p style="font-size: 24px; color: gray;">
-                            <i class="bi bi-filetype-mp4" style="font-size: 3rem;"></i><br>
-                            Drag & Drop to Upload File
-                        </p>
-                      </div>`;
+});
+
+function initFileInput() {
+    filesInput.addEventListener('change', function(e) {
+        const newFiles = Array.from(this.files).filter(file => 
+            file.name.toLowerCase().endsWith('.mp4') &&
+            !dropFiles.some(f => f.name === file.name && f.size === file.size) // 去重
+        );
+        
+        if (newFiles.length > 0) {
+            dropFiles = [...dropFiles, ...newFiles];
+            updateFileList(dropFiles);
+            dropbox.style.display = 'none';
+            fileListContainer.style.display = 'block';
+        }
+        this.value = ''; // 清空输入
+    });
+}
+
+// 初始化时调用
+initFileInput();
+
+//点击事件文件上传
+dropbox.addEventListener('click', function () {
+    filesInput.click();
 });
 
 function readAllEntries(entry) {
@@ -123,82 +135,50 @@ function readAllEntries(entry) {
     });
 }
 
+// 创建文件列表表格
+function createFileListTable(files) {
+    const tableDiv = document.createElement('div');
+    tableDiv.className = 'table-responsive';
+    tableDiv.style.cssText = `max-height: 300px; 
+                                overflow-y: auto;
+                                overflow-x: hidden;
+                                `;
+    const table = document.createElement('table');
+    table.className = 'table table-striped table-primary align-middle';
+    table.style.cssText = `width: 100%;
+                            justify-self: center;
+                            align-items: center;
+                            `;
+    const filesRows = files.map((file, index) => {
+        return `
+            <tr>
+                <th scope="row">${index + 1}</th>
+                <td class="text-primary">
+                    <i class="bi bi-filetype-mp4"></i>
+                    ${file.name}
+                    <div class="btn btn-sm border border-danger float-end delete-btn" data-index="${index}">
+                        <i class="bi bi-trash3 text-danger"></i>
+                    </div>
+                </td>
+                <td>
+                    <div class="progress">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated"
+                        role="progressbar"
+                        aria-valuenow="0"
+                        aria-valuemin="0"
+                        aria-valuemax="100"
+                        style="width: 0%">0%</div>
+                    </div>
+                </td>
+                <td class="text-secondary">${formatBytes(file.size)}</td>
+            </tr>
+        `;
+    }).join('');
 
-// button upload files
-document.getElementById('files').addEventListener('change', function (e) {
-    handleFileSelection(e.target.files);
-});
-// button upload folder
-document.getElementById('folder').addEventListener('change', function (e) {
-    handleFolderSelection(e.target.files);
-});
-
-// init file info list
-videoUploadModal.addEventListener('hidden.bs.modal', function () {
-    const fileListContainer = document.querySelector('#fileList');
-    if (fileListContainer) {
-        fileListContainer.innerHTML = '';
-    }
-    
-    const fileInput = document.getElementById('folder');
-    if (fileInput) {
-        fileInput.value = '';
-    }
-});
-
-// button files upload
-function handleFileSelection(files) {
-    if (files.length > 0) {
-        updateFileList(files);
-    } else {
-        alert('No file Selected, Please Check Again.');
-    }
-}
-
-// button folder upload
-function handleFolderSelection(files) {
-    const mp4Files = [];
-
-    for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        if (file.name.toLowerCase().endsWith('.mp4')) {
-            mp4Files.push(file);
-        }
-    }
-
-    if (mp4Files.length > 0) {
-        updateFileList(mp4Files);
-    } else {
-        alert('未找到任何 .mp4 文件，请选择包含 .mp4 文件的文件夹。');
-    }
-}
-
-
-// 创建固定表头的表格
-function createFixedHeaderTable(files) {
-    // 创建外层容器
-    const tableContainer = document.createElement('div');
-    tableContainer.className = 'table-container';
-    tableContainer.style.cssText = `
-        position: relative;
-        max-height: 300px;
-    `;
-
-    // 创建表头容器
-    const headerContainer = document.createElement('div');
-    headerContainer.className = 'header-container';
-    headerContainer.style.cssText = `
-        position: sticky;
-        top: 0;
-        z-index: 1;
-        background-color: #fff;
-    `;
-
-    // 创建表头表格
-    const headerTable = document.createElement('table');
-    headerTable.className = 'table table-bordered mb-0';
-    headerTable.innerHTML = `
-        <thead>
+    // TODO: add a button to delete all files. 
+    // TODO: 追加删除所有文件的按钮
+    table.innerHTML = `
+        <thead style="position:sticky; top:0; z-index:500;">
             <tr>
                 <th style="width: 5%">#</th>
                 <th style="width: 45%">File Name</th>
@@ -206,76 +186,54 @@ function createFixedHeaderTable(files) {
                 <th style="width: 15%">File Size</th>
             </tr>
         </thead>
+        <tbody class="table-group-divider overflow-auto">
+            ${filesRows}
+        </tbody>
     `;
-    headerContainer.appendChild(headerTable);
+    tableDiv.appendChild(table);
 
-    // 创建内容容器
-    const bodyContainer = document.createElement('div');
-    bodyContainer.className = 'body-container';
-    bodyContainer.style.cssText = `
-        overflow-y: auto;
-        max-height: calc(300px - 42px); /* 减去表头高度 */
-    `;
-
-    // 创建内容表格
-    const bodyTable = document.createElement('table');
-    bodyTable.className = 'table table-striped table-bordered mb-0';
+    tableDiv.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            const row = this.closest('tr');
+            row.classList.add('delete-animation');
+            setTimeout(() => {
+                const index = parseInt(this.dataset.index);
+                dropFiles.splice(index, 1);
+                updateFileList(dropFiles);
+            }, 500);
+        });
+    });
+    return tableDiv;
     
-    // 创建tbody
-    const tbody = document.createElement('tbody');
-    files.forEach((file, index) => {
-        const row = document.createElement('tr');
-        row.className = 'file-item';
-        row.fileReference = file;
-
-        row.innerHTML = `
-            <td style="width: 5%">${index + 1}</td>
-            <td style="width: 45%">
-                <div class="file-icon text-primary">
-                    <i class="bi bi-filetype-mp4"></i>
-                    ${file.name}
-                </div>
-            </td>
-            <td style="width: 35%">
-                <div class="progress">
-                    <div class="progress-bar progress-bar-striped progress-bar-animated"
-                         role="progressbar"
-                         aria-valuenow="0"
-                         aria-valuemin="0"
-                         aria-valuemax="100"
-                         style="width: 0%">0%</div>
-                </div>
-            </td>
-            <td style="width: 15%" class="text-secondary">${formatBytes(file.size)}</td>
-        `;
-        tbody.appendChild(row);
-    });
-
-    bodyTable.appendChild(tbody);
-    bodyContainer.appendChild(bodyTable);
-
-    // 添加滚动同步
-    bodyContainer.addEventListener('scroll', () => {
-        headerTable.style.transform = `translateX(-${bodyContainer.scrollLeft}px)`;
-    });
-
-    // 组装最终的表格
-    tableContainer.appendChild(headerContainer);
-    tableContainer.appendChild(bodyContainer);
-
-    return tableContainer;
 }
 
 // 更新文件列表
 function updateFileList(files) {
     fileListContainer.innerHTML = '';
-    files = Array.from(files);
+    fileListContainer.style.maxHeight = '100%';
 
     if (files.length > 0) {
         // 已经只包含 .mp4 文件，不再需要检查
-        fileListContainer.appendChild(createFixedHeaderTable(files));
+        fileListContainer.appendChild(createFileListTable(files));
     } else {
-        alert('Only .mp4 type file support');
+        dropFiles = [];
+        dropbox.style = '';
+        dropbox.style.display = 'block';
+        dropbox.innerHTML = `
+            <div class="d-flex justify-content-center align-items-center" style="height: 100%;">
+                <p class="text-box" style="font-size: 24px; color: gray;">
+                    <i class="bi bi-filetype-mp4" style="font-size: 5rem;"></i><br>
+                    <i class="fa-solid fa-arrow-pointer fs-6"></i> Click or <i class="fa-solid fa-file-arrow-up fs-6"></i> Drop to Upload File
+                </p>
+            </div>
+        `;
+        fileListContainer.style.display = 'none';
+        fileListContainer.innerHTML = '';
+        filesInput.value = '';
+        if(document.getElementById('videoSubmit').disabled) {
+            document.getElementById('videoSubmit').disabled = false;
+        }
     }
 }
 
@@ -289,45 +247,6 @@ function formatBytes(bytes, decimals = 2) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
 
-
-function handleFileInput(event) {
-    event.preventDefault();
-    const promises = [];
-
-    if (event.dataTransfer && event.dataTransfer.items) {
-        // 处理拖放文件
-        const items = event.dataTransfer.items;
-        for (let i = 0; i < items.length; i++) {
-            if (items[i].kind === 'file') {
-                const entry = items[i].webkitGetAsEntry();
-                if (entry) {
-                    promises.push(readEntry(entry));
-                }
-            }
-        }
-
-        Promise.all(promises).then(results => {
-            const allFiles = results.flat(Infinity);
-            updateFileList(allFiles);
-        });
-    } else if (event.target && event.target.files) {
-        // 处理通过文件输入选择的文件
-        const files = event.target.files;
-        const mp4Files = [];
-        for (let i = 0; i < files.length; i++) {
-            const file = files[i];
-            if (file.name.toLowerCase().endsWith('.mp4')) {
-                mp4Files.push(file);
-            }
-        }
-
-        if (mp4Files.length > 0) {
-            updateFileList(mp4Files);
-        } else {
-            alert('Not found .mp4 file. Please check upload foler again.');
-        }
-    }
-}
 
 
 function readEntry(entry) {
@@ -361,6 +280,8 @@ function readEntry(entry) {
     }
 }
 
+
+
 // video submit
 const MAX_SIMULTANEOUS_UPLOADS = 1; // max file queue => 4
 let uploadQueue = [];
@@ -370,17 +291,35 @@ const form = document.getElementById('videoForm');
 const videoUploadURL = form.getAttribute('data-url');
 
 // check uploading video queue
-function startUploads() {
-    const files = document.querySelectorAll('#fileList .file-item');
+// function startUploads() {
+//     const files = document.querySelectorAll('#fileList .file-item');
 
-    files.forEach(fileItem => {
-        const progressBarElement = fileItem.querySelector('.progress');
-        progressBarElement.style.display = "block";
-        const fileItemIcon = fileItem.querySelector('.bi');
+//     files.forEach(fileItem => {
+//         const progressBarElement = fileItem.querySelector('.progress');
+//         progressBarElement.style.display = "block";
+//         const fileItemIcon = fileItem.querySelector('.bi');
+//         if (activeUploads < MAX_SIMULTANEOUS_UPLOADS) {
+//             uploadFile(fileItem.fileReference, progressBarElement, fileItemIcon);
+//         } else {
+//             uploadQueue.push({ file: fileItem.fileReference, progressBar: progressBarElement, icon: fileItemIcon});
+//         }
+//     });
+// }
+function startUploads() {
+    const progressBars = document.querySelectorAll(`.progress-bar`);
+    const icons = document.querySelectorAll(`.bi-filetype-mp4`);
+    // 直接使用全局状态而非DOM
+    dropFiles.forEach((file, index) => {
+        const progressBar = progressBars[index];
+        const icon = icons[index];
+        
+        progressBar.className = 'progress-bar progress-bar-striped progress-bar-animated';
+        icon.className = "bi bi-filetype-mp4";
+
         if (activeUploads < MAX_SIMULTANEOUS_UPLOADS) {
-            uploadFile(fileItem.fileReference, progressBarElement, fileItemIcon);
+            uploadFile(file, progressBar, icon);
         } else {
-            uploadQueue.push({ file: fileItem.fileReference, progressBar: progressBarElement, icon: fileItemIcon});
+            uploadQueue.push({ file, progressBar, icon });
         }
     });
 }
@@ -429,20 +368,20 @@ function uploadFile(file, progressBar, icon) {
                 const progress = Math.floor((offset / file.size) * 100);
                 // console.log(progress)
                 uploadChunk();
-                progressBar.querySelector('.progress-bar').style.width = progress + '%';
-                progressBar.querySelector('.progress-bar').textContent = progress + '%';
+                progressBar.style.width = progress + '%';
+                progressBar.textContent = progress + '%';
                 if (progress === 100) {
                     icon.className = "bi bi-check-circle-fill text-success";
-                    progressBar.querySelector('.progress-bar').className = 'progress-bar progress-bar-striped bg-success';
+                    progressBar.className = 'progress-bar progress-bar-striped bg-success';
                 }else {
                     icon.className = "spinner-border spinner-border-sm text-secondary";
                 }
             }else if (xhr.status !== 200) {
                 offset += Infinity;
                 icon.className = "bi bi-x-circle-fill text-danger";
-                progressBar.querySelector('.progress-bar').style.width = 100 + '%';
-                progressBar.querySelector('.progress-bar').textContent = `error ${xhr.status}:` + JSON.parse(xhr.responseText).message;
-                progressBar.querySelector('.progress-bar').className = 'progress-bar progress-bar-striped bg-danger';
+                progressBar.style.width = 100 + '%';
+                progressBar.textContent = `error ${xhr.status}:` + JSON.parse(xhr.responseText).message;
+                progressBar.className = 'progress-bar progress-bar-striped bg-danger';
                 uploadChunk();
             }
         };
