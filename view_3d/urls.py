@@ -26,8 +26,9 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path('admin/unlock-account/<int:user_id>/', CustomUserAdmin.unlock_account, name='unlock_account'),
 
-    path('', include('map.urls')),
-    path('home/', include('home.urls')),
+    path('', include('home.urls')),
+    path('main/', include('map.urls')),
+    
     path('accounts/', include('accounts.urls')),
     
 ]
@@ -35,3 +36,4 @@ if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
+# Asdf858512@@

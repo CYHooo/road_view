@@ -35,10 +35,6 @@ const styles = `
         transition: transform 0.2s ease;
     }
 
-    .img-thumbnail:hover {
-        transform: scale(1.02);
-    }
-
     .tree-form-title {
         font-size: 1.2rem;
         font-weight: bold;
@@ -46,15 +42,6 @@ const styles = `
         color: #2c3e50;
     }
 
-    .btn-primary {
-        background-color: #4a90e2;
-        border-color: #357abd;
-    }
-
-    .btn-primary:hover {
-        background-color: #357abd;
-        border-color: #2e6da4;
-    }
 
     .photo-section {
         background-color: rgba(0, 0, 0, 0.02);
@@ -84,7 +71,7 @@ function createForm(infoDatas=null) {
     const formHTML = `
         ${styles}
 
-        <div class="container">
+        <div class="container-sm">
             <form class="border border-2 border-dark rounded-3 p-2 mb-3">
                 <!-- 第一行、第二行与右侧"수목 No.(측점 수)"对齐 -->
                 <div class="row text-dark text-center g-1 mb-1">
@@ -263,7 +250,7 @@ function createForm(infoDatas=null) {
                 </div>  
             </form>
             <div id="btn-group" class="d-grid gap-2 d-md-flex justify-content-md-end mb-3">
-                <button id="save-btn" type="submit" class="btn btn-primary me-md-2">
+                <button id="save-btn" type="submit" class="btn btn-primary me-md-2 ">
                     저장
                 </button>
                 <button id="cancel-btn" type="close" class="btn btn-secondary">
@@ -386,7 +373,7 @@ function onSaveClick(pointObj, infoObj, index, sprite) {
     // scene.remove(infoObj);
     const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
 
-    fetch('/form_update/', {
+    fetch('/main/form_update/', {
         method: 'POST',
         headers: {
             'X-CSRFToken': csrftoken,

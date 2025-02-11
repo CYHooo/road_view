@@ -22,21 +22,59 @@ let markers = [];
 const buttons = [];
 const tweenGroup = new Group();
 
+let sprites = [];
+
 
 init();
+
+window.addEventListener('mousemove', (e) => {
+    const container = document.getElementById('container');
+    const rect = container.getBoundingClientRect();
+    const mouse = new THREE.Vector2();
+    mouse.x = ((e.clientX - rect.left) / container.clientWidth) * 2 - 1;
+    mouse.y = -((e.clientY - rect.top) / container.clientHeight) * 2 + 1;
+
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(mouse, camera);
+
+    let isAnyHovered = false;
+
+    // 检查所有 sprite 是否被鼠标悬停
+    sprites.forEach(sprite => {
+        const intersects = raycaster.intersectObject(sprite);
+        if (intersects.length > 0) {
+            isAnyHovered = true;
+            sprite.material.color.set('rgb(240,128,128)');
+            sprite.scale.set(0.6,0.6,0.6);
+        } else {
+            sprite.scale.set(0.4,0.4,0.4);
+            sprite.material.color.set('rgb(0,192,144)');
+        }
+    });
+    // const intersected = sprites.some(sprite => {
+    //     const intersects = raycaster.intersectObject(sprite);
+    //     return intersects.length > 0;
+    // });
+
+    // 根据检测结果设置 cursor
+    container.style.cursor = isAnyHovered ? 'pointer' : 'auto';
+});
 
 function init() {
     const container = document.getElementById('container');
 
+    const containerWidth = container.clientWidth;
+    const containerHeight = container.clientHeight;
+        
     renderer = new THREE.WebGLRenderer();
     renderer.setPixelRatio( window.devicePixelRatio );
-    renderer.setSize( window.innerWidth, window.innerHeight );
+    renderer.setSize( containerWidth, containerHeight );
     renderer.setAnimationLoop( animate );
     container.appendChild( renderer.domElement );
 
-    // button div style
+    // info div style
     labelRenderer = new CSS2DRenderer();
-    labelRenderer.setSize(window.innerWidth, window.innerHeight);
+    labelRenderer.setSize(containerWidth, containerHeight);
     labelRenderer.domElement.style.position = 'absolute';
     labelRenderer.domElement.style.top = '0';
     labelRenderer.domElement.style.left = '0';
@@ -49,14 +87,14 @@ function init() {
 
     scene = new THREE.Scene();
     setScene(scene);
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera = new THREE.PerspectiveCamera(75, containerWidth / containerHeight, 0.1, 100);
     camera.position.set(0, 0, 0.1);
 
     // mouse control
     controls = new OrbitControls( camera, renderer.domElement );
     controls.enablePan = false;
     controls.zoomSpeed = 10;
-    controls.enableZoom = true;
+    controls.enableZoom = false;
     controls.rotateSpeed = -0.5;
     // controls.maxDistance = 0.1;
 
@@ -85,7 +123,7 @@ function loadImage(index) {
     
 
     // GET TypeInfo data
-    fetch(`/form_update/?image_id=${images[index].id}`, {
+    fetch(`/main/form_update/?image_id=${images[index].id}`, {
         method: 'GET',
     })
     .then(response => response.json())
@@ -128,6 +166,7 @@ function createMarker(i) {
     sprite.scale.set(0.4,0.4,0);
     sprite.position.set(i.position.x, i.position.y, i.position.z);
     sprite.userData = {i, isInfoBoxOpen: false};
+    sprites.push(sprite);
     clickEventToSprite(sprite);
     
     
@@ -142,19 +181,29 @@ function clickEventToSprite(sprite) {
     const mouse = new THREE.Vector2();
 
     function onClick(e) {
-        mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-        mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+        // 实时获取容器尺寸
+        const container = document.getElementById('container');
+        const currentWidth = container.clientWidth;
+        const currentHeight = container.clientHeight;
+
+        // 计算相对于容器的坐标
+        const rect = container.getBoundingClientRect();
+        mouse.x = ((e.clientX - rect.left) / currentWidth) * 2 - 1;
+        mouse.y = -((e.clientY - rect.top) / currentHeight) * 2 + 1;
+
+        // mouse.x = (e.clientX / containerWidth) * 2 - 1;
+        // mouse.y = -(e.clientY / containerHeight) * 2 + 1;
 
         raycaster.setFromCamera(mouse, camera);
 
         const intersects = raycaster.intersectObject(sprite);
         if (intersects.length > 0) {
             if (sprite.userData.isInfoBoxOpen) return;
-
             sprite.userData.isInfoBoxOpen = true;
             showInfoBox(sprite.userData.i, sprite);
         }
     }
+
     // 防止重复绑定
     if (!sprite.userData.eventBound) {
         window.addEventListener('click', onClick);
@@ -236,7 +285,7 @@ function getTexturesFromAtlasFile( imgURL, num ) {
 
 
 function createPanel() {
-    gui = new GUI( { width: 150 });
+    gui = new GUI( { width: 200 } );
     conf = {
         capture: capturePoint,
     }
@@ -362,13 +411,13 @@ function onMouseClick() {
 function createButton(text, position, onClick) {
     const button = document.createElement('button');
     button.textContent = text;
-    button.style.position = 'fixed';
+    button.style.position = 'absolute';
     button.classList = 'btn btn-outline-primary';
     button.style.width = '100px';
     button.style.height = '50px';
     button.style.padding = '10px';
     button.style.cursor = 'pointer';
-    button.style.zIndex = 1000;
+    button.style.zIndex = 1003;
     button.style.pointerEvents = 'auto';
 
     // 根据 position 决定按钮的具体位置
@@ -383,7 +432,7 @@ function createButton(text, position, onClick) {
     }
 
     button.addEventListener('click', onClick);
-    document.body.appendChild(button); // 将按钮添加到页面上，而不是场景中
+    container.appendChild(button); // 将按钮添加到页面上，而不是场景中
 
     return button;
 }
@@ -445,11 +494,14 @@ function transitionToImage(targetIndex, target_z) {
 }
 
 function onWindowResize() {
+    const container = document.getElementById('container');
+    const containerWidth = container.clientWidth;
+    const containerHeight = container.clientHeight;
 
-    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.aspect = containerWidth / containerHeight;
     camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    labelRenderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setSize(containerWidth, containerHeight);
+    labelRenderer.setSize(containerWidth, containerHeight);
 
 }
 

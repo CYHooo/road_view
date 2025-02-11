@@ -12,11 +12,16 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 
 from pathlib import Path
 import os
-
+import environ
+# import my_settings
+# import pymysql
+# pymysql.install_as_MySQLdb()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-import my_settings
-SECRET_KEY = my_settings.SECRET_KEY
+env = environ.Env(DEBUG=(bool, False))
+environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
+SECRET_KEY = 'django-insecure-v1q4me==@piozx94wy2ty^w*i#2kgn+_6u61=af#vl#$zo)9!6'
+# SECRET_KEY = my_settings.SECRET_KEY
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
@@ -90,8 +95,17 @@ WSGI_APPLICATION = 'view_3d.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
-DATABASES = my_settings.DATABASES
-
+DATABASES = {
+    'default':{
+        "ENGINE": "django.db.backends.mysql",
+        "NAME": env("DB_NAME"),
+        "USER": env("DB_USER"),
+        "PASSWORD": env("DB_PASSWORD"),
+        "HOST": env("DB_HOST"),
+        "PORT": env("DB_PORT"),
+        }
+}
+# DATABESES = my_settings.DATABASES
 
 # Password validation
 # https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators

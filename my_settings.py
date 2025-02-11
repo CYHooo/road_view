@@ -6,10 +6,10 @@ pymysql.install_as_MySQLdb()
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': '3dview_2',
-        'USER': 'root',
-        'PASSWORD' : 'R1d1s9**',
-        'HOST' : 'test.c52c2ks4amjm.ap-northeast-2.rds.amazonaws.com',
+        'NAME': '3dview_v3',
+        'USER': 'local',
+        'PASSWORD' : '123456789',
+        'HOST' : 'localhost',
         'PORT' : '3306',
         'OPTIONS': {
         'init_command' : "SET sql_mode='STRICT_TRANS_TABLES'",

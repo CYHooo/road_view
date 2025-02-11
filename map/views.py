@@ -22,7 +22,7 @@ def dashboard(request):
     return render(request, 'map/dashboard.html')
 
 
-def index(request):
+def panorama_index(request):
     # 查询所有视频对象
     videos = PanoramaVideo.objects.all()
     video_data = []
@@ -76,7 +76,7 @@ def index(request):
         'data': video_data,  # 每个视频及其对应第一帧图片的数据
     }
 
-    return render(request, 'map/index.html', context)
+    return render(request, 'map/panorama_preview.html', context)
 
 # 异步文件写入
 async def write_file_async(file_path, file_chunk, offset):
@@ -246,6 +246,9 @@ def crop_frame_to_img(video_obj, interval=3):
 
     return 200
 
+def videoupload_index(request):
+    return render(request, 'map/videoupload_index.html')
+
 @csrf_exempt
 def videoupload(request):
 
@@ -299,19 +302,24 @@ def videoupload(request):
                 return JsonResponse({'message': 'crop frame failed'}, status=406)
 
         return JsonResponse({'status': 'partial'})
-    return  redirect('index')
+    return  redirect('videoupload_index')
 
-def view(request, video_id):
-    video = get_object_or_404(PanoramaVideo, id=video_id)
-    frames = PanoramaImage.objects.filter(video_id=video_id).order_by('id')
-    images = [{'id': frame.id, 'url': frame.image.url} for frame in frames]
-    
-    context = {
-        'video': video,
-        'images': images,
-    }
 
-    return render(request, 'map/view.html', context)
+def panorama(request, video_id=None):
+    if video_id is not None:
+        video = get_object_or_404(PanoramaVideo, id=video_id)
+        frames = PanoramaImage.objects.filter(video_id=video_id).order_by('id')
+        images = [{'id': frame.id, 'url': frame.image.url} for frame in frames]
+        
+        context = {
+            'video': video,
+            'images': images,
+            'data': {},
+        }
+
+        return render(request, 'map/panorama_preview.html', context)
+    else:
+        return redirect('panorama_index')
 
 @transaction.atomic
 def form_update(request):
