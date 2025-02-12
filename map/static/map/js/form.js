@@ -5,7 +5,7 @@
  * Data include tree info && work images.
 */
 import { scene, pointerControls, markers, setScene } from './param.js';
-import { createMarker, clickEventToSprite, clearMarkers, loadImage } from './view.js';
+import { createMarker, clickEventToSprite, clearMarkers, loadImage, isMobileDevice } from './view.js';
 // CSS 스타일을 JavaScript 문자열로 정의
 const styles = `
 <style>
