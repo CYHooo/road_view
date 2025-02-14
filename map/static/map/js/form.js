@@ -80,15 +80,15 @@ function createForm(infoDatas=null) {
 
                         <!-- 第一行：장 소、수종 -->
                         <div class="row g-1 mb-1">
-                            <div class="col-8">
+                            <div class="col">
                                 <div class="input-group">
-                                    <span class="input-group-text font-monospace text-bg-dark bg-opacity-75">장 소</span>
+                                    <span class="w-25 input-group-text font-monospace text-bg-dark bg-opacity-75">장 소</span>
                                     <input id="address" value="${infoDatas ? infoDatas.address : ''}" type="text" class="form-control" placeholder="장 소" aria-label="address">
                                 </div>
                             </div>
                             <div class="col">
                                 <div class="input-group">
-                                    <span class="input-group-text font-monospace text-bg-dark bg-opacity-75" >수 종</span>
+                                    <span class="w-25 input-group-text font-monospace text-bg-dark bg-opacity-75" >수 종</span>
                                     <input id="treeType" value="${infoDatas ? infoDatas.treeType : ''}" type="text" class="form-control" placeholder="수 종" aria-label="treeType">
                                 </div>
                             </div>
@@ -98,13 +98,13 @@ function createForm(infoDatas=null) {
                         <div class="row g-1">
                             <div class="col">
                                 <div class="input-group">
-                                    <span class="input-group-text font-monospace text-bg-dark bg-opacity-75" >흉고직경</span>
+                                    <span class="w-25 input-group-text font-monospace text-bg-dark bg-opacity-75" >흉고직경</span>
                                     <input id="diameter" value="${infoDatas ? infoDatas.diameter : ''}" type="number" class="form-control" placeholder="흉고직경" aria-label="diameter">
                                 </div>
                             </div>
                             <div class="col">
                                 <div class="input-group">
-                                    <span class="input-group-text font-monospace text-bg-dark bg-opacity-75">수고</span>
+                                    <span class="w-25 input-group-text font-monospace text-bg-dark bg-opacity-75">수 고</span>
                                     <input id="treeHeight" value="${infoDatas ? infoDatas.treeHeight : ''}" type="number" class="form-control" placeholder="수 고" aria-label="treeHeight">
                                 </div>
                             </div>
@@ -115,7 +115,7 @@ function createForm(infoDatas=null) {
                     <!-- 右侧区域：수목 No.(측점 수) 占据两行的视觉高度 -->
                     <div class="col-4 d-flex align-items-stretch">
                         <div class="input-group">
-                            <span class="input-group-text font-monospace text-bg-dark bg-opacity-75">수목 No.<br>(측점 수)</span>
+                            <span class="w-50 input-group-text font-monospace text-bg-dark bg-opacity-75">수목 No.<br>(측점 수)</span>
                             <input id="treeNum" value="${infoDatas ? infoDatas.treeNum : ''}" type="number" class="form-control" placeholder="측점 수" aria-label="treeNum">
                         </div>
                     </div>
@@ -125,19 +125,19 @@ function createForm(infoDatas=null) {
                 <div class="row text-dark text-center g-1 mb-1">
                     <div class="col-4">
                         <div class="input-group">
-                            <span class="input-group-text font-monospace text-bg-dark bg-opacity-75">사용기종</span>
+                            <span class="w-25 input-group-text font-monospace text-bg-dark bg-opacity-75">사용기종</span>
                             <input id="treeUse" value="${infoDatas ? infoDatas.treeUse : ''}" type="text" class="form-control" placeholder="사용기종" aria-label="treeUse">
                         </div>
                     </div>
                     <div class="col-4">
                         <div class="input-group">
-                            <span class="input-group-text font-monospace text-bg-dark bg-opacity-75">측정자 소속</span>
+                            <span class="w-25 input-group-text font-monospace text-bg-dark bg-opacity-75">측정자 소속</span>
                             <input id="workerType" value="${infoDatas ? infoDatas.workerType : ''}" type="text" class="form-control" placeholder="측정자 소속" aria-label="workerType">
                         </div>
                     </div>
                     <div class="col-4">
                         <div class="input-group">
-                            <span class="input-group-text font-monospace text-bg-dark bg-opacity-75">측정자 성명</span>
+                            <span class="w-50 input-group-text font-monospace text-bg-dark bg-opacity-75">측정자 성명</span>
                             <input id="workerName" value="${infoDatas ? infoDatas.workerName : ''}" type="text" class="form-control" placeholder="측정자 성명" aria-label="workerName">
                         </div>
                     </div>

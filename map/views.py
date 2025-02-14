@@ -79,6 +79,62 @@ def panorama_index(request):
 
     return render(request, 'map/panorama_preview.html', context)
 
+
+def panorama_index2(request):
+    # 查询所有视频对象
+    videos = PanoramaVideo.objects.all()
+    video_data = []
+
+    for video in videos:
+        # 获取该视频的第一张帧图片
+        first_image = PanoramaImage.objects.filter(video_id=video.id).order_by('image').first()
+        
+        if first_image:
+            # 如果有帧图片，获取图片的 URL
+            image_url = os.path.join(settings.MEDIA_URL, first_image.image.url)
+            image_path = first_image.image.path
+            image = cv2.imread(image_path)
+
+            if image is not None:
+                h, w, _ = image.shape
+                face_w = w // 6
+                face_h = h
+
+                interface = image[:, face_w * 4 : face_w * 5] ## get cube image's <front-face> range
+                _, buffer = cv2.imencode('.jpg', interface)
+                img_base64 = base64.b64encode(buffer).decode('utf-8')
+                img_data = f"data:image/jpeg;base64,{img_base64}"
+                # 构造传递给前端的数据
+                video_data.append({
+                    'video_id': video.id,
+                    'video_name': video.name,
+                    'first_image': img_data,
+                })
+            else:
+                # 如果无法读取图像，使用占位图
+                image_url = os.path.join(settings.STATIC_URL, 'placeholder.png')
+                video_data.append({
+                    'video_id': video.id,
+                    'video_name': video.name,
+                    'first_image': image_url,
+                })
+
+        else:
+            # 如果没有帧图片，可以设置一个占位图或 None
+            image_url = os.path.join(settings.STATIC_URL, 'placeholder.png')  # 替换为实际的占位图片路径
+        
+            # 构造传递给前端的数据
+            video_data.append({
+                'video_id': video.id,
+                'video_name': video.name,
+                'first_image': image_url,
+            })
+
+    context = {
+        'data': video_data,  # 每个视频及其对应第一帧图片的数据
+    }
+
+    return render(request, 'map/panorama_preview2.html', context)
 # 异步文件写入
 async def write_file_async(file_path, file_chunk, offset):
     mode = 'wb' if offset == 0 else 'ab'
@@ -328,6 +384,22 @@ def panorama(request, video_id=None):
     else:
         return redirect('panorama_index')
 
+def panorama2(request, video_id=None):
+    if video_id is not None:
+        video = get_object_or_404(PanoramaVideo, id=video_id)
+        frames = PanoramaImage.objects.filter(video_id=video_id).order_by('id')
+        images = [{'id': frame.id, 'url': frame.image.url} for frame in frames]
+        
+        context = {
+            'video': video,
+            'images': images,
+            'data': {},
+        }
+
+        return render(request, 'map/panorama_preview2.html', context)
+    else:
+        return redirect('panorama_index2')
+
 @transaction.atomic
 def form_update(request):
     '''
@@ -443,6 +515,120 @@ def form_update(request):
         else:
             return JsonResponse({"message": "No image id matching"}, status=404)
 
+@transaction.atomic
+def form_update2(request):
+    '''
+        type info position && text value
+    '''
+    if request.method == 'POST':
+        form = TreeInfoForm(request.POST, request.FILES)
+        if form.is_valid():
+            try:
+                data = form.cleaned_data
+                save_path = os.path.join(settings.MEDIA_ROOT, 'tree', str(data['imageId']))
+                os.makedirs(save_path, exist_ok=True)
+                form_obj, created = TypeInfo.objects.get_or_create(
+                    x=decimal.Decimal(data['x']).quantize(decimal.Decimal("00000000.000000")) ,
+                    y=decimal.Decimal(data['y']).quantize(decimal.Decimal("00000000.000000")) ,
+                    z=decimal.Decimal(data['z']).quantize(decimal.Decimal("00000000.000000")) ,
+                    image_id = PanoramaImage.objects.get(id=data['imageId']),
+                    defaults={
+                        'address': data['address'],
+                        'tree_type': data['treeType'],
+                        'tree_num': data['treeNum'],
+                        'diameter': data['diameter'],
+                        'tree_height': data['treeHeight'],
+                        'crown_width': data['treeWidth'],
+                        'tree_use': data['treeUse'],
+                        'worker_type': data['workerType'],
+                        'worker_name': data['workerName'],
+                    }
+                )
+                if not created:
+                    # 如果对象已存在，更新字段
+                    field_mapping = {
+                        'address': 'address',
+                        'treeType': 'tree_type',
+                        'treeNum': 'tree_num',
+                        'diameter': 'diameter',
+                        'treeHeight': 'tree_height',
+                        'treeWidth': 'crown_width',
+                        'treeUse': 'tree_use',
+                        'workerType': 'worker_type',
+                        'workerName': 'worker_name',
+                    }
+
+                    for form_field, model_field in field_mapping.items():
+                        setattr(form_obj, model_field, data.get(form_field))
+
+                    form_obj.save()
+
+                # 定义文件字段映射： (表单字段名, 模型字段名, 文件前缀)
+                image_fields = [
+                    ('pre', 'front_image', 'pre'),
+                    ('west', 'west_image', 'west'),
+                    ('east', 'east_image', 'east'),
+                    ('south', 'south_image', 'south'),
+                    ('north', 'north_image', 'north'),
+                ]
+
+                for form_field, model_field, prefix in image_fields:
+                    file_obj = data.get(form_field)
+                    if file_obj:
+                        relative_path = f"{data['imageId']}/{prefix}_{file_obj.name}"
+                        getattr(form_obj, model_field).save(relative_path, file_obj, save=True)
+                return JsonResponse({
+                            'success': True,
+                            'updatedData': {
+                                'address': form_obj.address,
+                                'treeType': form_obj.tree_type,
+                                'treeNum': form_obj.tree_num,
+                                'diameter': form_obj.diameter,
+                                'treeHeight': form_obj.tree_height,
+                                'treeWidth': form_obj.crown_width,
+                                'treeUse': form_obj.tree_use,
+                                'workerType': form_obj.worker_type,
+                                'workerName': form_obj.worker_name,
+                                'pre_img': form_obj.front_image.url if form_obj.front_image else None,
+                                'west_img': form_obj.west_image.url if form_obj.west_image else None,
+                                'east_img': form_obj.east_image.url if form_obj.east_image else None,
+                                'south_img': form_obj.south_image.url if form_obj.south_image else None,
+                                'north_img': form_obj.north_image.url if form_obj.north_image else None,
+                                'position': {'x':form_obj.x, 'y':form_obj.y, 'z':form_obj.z}
+                            }
+                        }, status=200)
+            except Exception as e:
+                return JsonResponse({'success': False, 'error': str(e)}, status=500)
+        else:
+            return JsonResponse({"message": "form data not valid"}, status=404)
+    elif request.method == "GET":
+        image_id = request.GET.get('image_id')
+        if image_id:
+            type_objs = TypeInfo.objects.filter(image_id=image_id)
+            data = []
+            for obj in type_objs:
+                data.append({
+                    'id': obj.id,
+                    'address': obj.address,
+                    'treeType': obj.tree_type,
+                    'treeNum': obj.tree_num,
+                    'diameter': obj.diameter,
+                    'treeHeight': obj.tree_height,
+                    'treeWidth': obj.crown_width,
+                    'treeUse': obj.tree_use,
+                    'workerName': obj.worker_name,
+                    'workerType': obj.worker_type,
+                    'pre_img': obj.front_image.url if obj.front_image else None,
+                    'north_img': obj.north_image.url if obj.north_image else None,
+                    'south_img': obj.south_image.url if obj.south_image else None,
+                    'east_img': obj.east_image.url if obj.east_image else None,
+                    'west_img': obj.west_image.url if obj.west_image else None,
+                    'position': {'x': obj.x, 'y': obj.y, 'z': obj.z},
+                })
+
+            return JsonResponse({"data": data}, status=200)
+        else:
+            return JsonResponse({"message": "No image id matching"}, status=404)
 
 def form_data(request):
     pass
