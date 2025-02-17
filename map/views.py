@@ -5,6 +5,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 from django.db import transaction
 from .models import PanoramaImage,PanoramaVideo,TypeInfo
+from sensor.models import Sensor
 import os
 import aiofiles
 import asyncio
@@ -235,7 +236,7 @@ def render_cubemap_face(image, width, height, cube_width, cube_height, direction
     return face
 
 
-def crop_frame_to_img(video_obj, interval=3):
+def crop_frame_to_img(video_obj, interval):
     '''
         get frame from video, crop 6 images for a cube from each frame image.
         
@@ -255,21 +256,23 @@ def crop_frame_to_img(video_obj, interval=3):
         print('can not open video file')
         return 406
     
-    # cap_time = ffmpeg.probe(video_path)['format']['tags']['comment']
-    # init_time = datetime.strptime(cap_time, '%Y-%m-%d %H:%M:%S +0000') ## video start record time tz=KR
 
     # get video frame info
     fps = cap.get(cv2.CAP_PROP_FPS)
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     duration = total_frames / fps
-    second = 0
+    # second = 0
 
     # make img path: '/media/img/{video_id}'
     save_path = os.path.join(settings.MEDIA_ROOT, "img", str(video_obj.id))
     os.makedirs(save_path, exist_ok=True)
     
-    # cut video frame image per 3s
-    while second < duration:
+    for index, second in enumerate(sorted(interval)):
+        if second < 0:
+            continue
+        if second > duration:
+            break
+
         frame_index = int(fps * second)
         cap.set(cv2.CAP_PROP_POS_FRAMES, frame_index)
 
@@ -277,27 +280,29 @@ def crop_frame_to_img(video_obj, interval=3):
         if not ret:
             print(f'Frame at {second} seconds could not be read')
             break
-        
-        # crop panorama to "front", "back", "left", "right", "up", "down",  6 images
-        height, width, _ = frame.shape
-        if width / height != 2:
-            raise ValueError(f"frame size is:{width}:{height}, not 2:1")
-        
-        # calc crop img size
-        cube_width = width // 4
-        cube_height = height // 2
-        cubemap_faces = panorama_to_cubemap(frame, cube_width, cube_height)
+        try:
+            height, width, _ = frame.shape
+            if width / height != 2:
+                raise ValueError(f"frame size is:{width}:{height}, not 2:1")
+            
+            # calc crop img size
+            cube_width = width // 4
+            cube_height = height // 2
+            cubemap_faces = panorama_to_cubemap(frame, cube_width, cube_height)
 
-        frame_filename = f"frame_{second:04d}.jpg"
-        frame_path = os.path.join(save_path, frame_filename)
-        cv2.imwrite(frame_path, cubemap_faces)
+            timestamp = int(video_obj.origintime + second)
+            frame_filename = f"frame_{timestamp}.jpg"
+            frame_path = os.path.join(save_path, frame_filename)
 
-        PanoramaImage.objects.create(
-            image=os.path.relpath(frame_path, settings.MEDIA_ROOT),
-            video_id=video_obj
-        )
+            cv2.imwrite(frame_path, cubemap_faces)
 
-        second += interval
+            PanoramaImage.objects.create(
+                image=os.path.relpath(frame_path, settings.MEDIA_ROOT),
+                video_id=video_obj
+            )
+        except Exception as e:
+            print(f'处理 {second}s 时出错: {str(e)}')
+            return 406
 
     cap.release()
 
@@ -333,6 +338,7 @@ def videoupload(request):
             try:
                 capture_time = ffmpeg.probe(temp_file).get("format",{}).get("tags",{}).get("comment")
                 timestamp = int(datetime.strptime(capture_time, '%Y-%m-%d %H:%M:%S %z').timestamp())
+                
                 if not capture_time or not timestamp:
                     return JsonResponse({'message': 'can not get video capture time'}, status=406)
                 
@@ -354,7 +360,28 @@ def videoupload(request):
                 video_obj.video = os.path.relpath(source_file, settings.MEDIA_ROOT)
                 video_obj.save()
 
-                status = crop_frame_to_img(video_obj)
+                # matching sensor data
+                video_date = datetime.fromtimestamp(timestamp).date()
+                start_time = int(datetime.combine(video_date, datetime.min.time()).timestamp())
+                end_time = int(datetime.combine(video_date, datetime.max.time()).timestamp())
+
+                sensor_data = Sensor.objects.filter(
+                    stamptime__gte=start_time,
+                    stamptime__lte=end_time
+                ).order_by('stamptime')
+
+                if sensor_data.exists():
+                    t = [
+                        sensor.stamptime - timestamp 
+                        for sensor in sensor_data
+                        if sensor.stamptime >= timestamp  # 过滤早于视频开始的时间
+                    ]
+
+                    status = crop_frame_to_img(video_obj, interval=t)
+                else:
+                    return JsonResponse({'message': 'no sensor data matching'}, status=406)
+
+                
                 if status == 200:
                     return JsonResponse({'message': "file upload success"}, status=200)
                 elif status == 406:
@@ -600,7 +627,7 @@ def form_update2(request):
             except Exception as e:
                 return JsonResponse({'success': False, 'error': str(e)}, status=500)
         else:
-            return JsonResponse({"message": "form data not valid"}, status=404)
+            return JsonResponse({"message": "form data not valid"}, status=404), '%Y-%m-%d %H:%M:%S'
     elif request.method == "GET":
         image_id = request.GET.get('image_id')
         if image_id:
@@ -632,3 +659,33 @@ def form_update2(request):
 
 def form_data(request):
     pass
+
+def demo(request):
+    return render(request, 'map/demo.html')
+
+def demoupload(request):
+    from zoneinfo import ZoneInfo
+    if request.method == 'POST':
+        text_file = request.FILES['demo']
+        # demo_file_path = os.path.join(settings.MEDIA_ROOT, 'demo/')
+        # os.makedirs(demo_file_path, exist_ok=True)
+        # demo_file = os.path.join(demo_file_path, text_file.name)
+
+        lines = text_file.read().decode('utf-8').split('\n')
+        try:
+            for l in lines:
+                if len(l) > 0:
+                    x, y, id, time = l.split(',')
+                    date = datetime.fromtimestamp(int(time), tz=ZoneInfo('Asia/Seoul'))
+                    Sensor.objects.get_or_create(
+                        x=x,
+                        y=y,
+                        id=id,
+                        stamptime=time,
+                        datetime=date
+                    )
+            return JsonResponse({'success': "file upload success"}, status=200)
+        except Exception as e:
+            return JsonResponse({'faild': str(e)}, status=406)
+        
+    return  redirect('demo')

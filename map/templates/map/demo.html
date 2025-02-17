@@ -1,0 +1,451 @@
+{% extends './base.html' %}
+{% load widget_tweaks %}
+{% load static %}
+{% block title %}Panorama{% endblock %}
+{% block style %}
+    <style>
+        .demo-box {
+            width: 100%;
+            height: 100vh;
+        }
+        .demo-title {
+            color: #2c3e50;
+            font-weight: 300;
+            font-size: 2.2rem;
+            letter-spacing: -0.5px;
+            margin-bottom: 2rem;
+            position: relative;
+            padding-bottom: 0.5rem;
+        }
+        .demo-body {
+            display: flex;                /* 启用 Flex 布局 */
+            justify-content: top;      /* 水平居中 */
+            align-items: center;          /* 垂直居中 */
+            min-height: 80vh;             /* 最小高度，确保在小屏幕也能居中 */
+            box-sizing: border-box;       /* 让 padding 不影响宽度计算 */
+            flex-direction: column;       /* 保证子元素垂直排列 */
+            width:100%;
+            padding: 20px;
+        }
+        .drop-box {
+            background: rgba(255, 255, 255, 0.4);
+            border: 3px dashed #bdc3c7 !important;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+            border: 3px dashed gray;
+            border-radius: 30px;
+            text-align: center; 
+            display: block;
+            cursor: pointer;
+        }
+        .drop-box:hover {
+            background: rgba(255, 255, 255, 0.7);
+            border: 3px solid rgba(0,0,0,0.7)  !important;
+            box-shadow: 1px 1px 5px 5px rgba(20, 20, 20, 0.1);
+        }
+        .drop-box:hover .text-box {
+            color: rgba(0,0,0,0.7) !important;
+        }
+
+        /* 删除动画 */
+        .delete-animation {
+            animation: deleteSlide 1s ease-out;
+        }
+        @keyframes deleteSlide {
+            from {
+                opacity: 1;
+            }
+            to {
+                opacity: 0;
+                transform: translateX(80%);
+            }
+        }
+
+    </style>
+
+{% endblock %}
+
+{% block content %}
+    <!-- panorama preview container -->
+    <div id="demo-index" class="d-flex justify-content-center align-items-center mb-1 mt-3">
+        <div class="demo-title" id="demo-title">Demo Data
+            <hr class="border border-primary border-1 opacity-70">
+        </div>
+    </div>
+    <div class="demo-body">
+        <div class="row" style="width: 80%;">
+            <div id="fileListContainer" class="d-flex justify-content-center align-items-center mb-5 mt-3" style="height:300px;">
+                <!-- File List -->
+                <div id="fileList" style="width: 80%; height: 100%; 
+                                            box-shadow:1px 1px 3px 3px rgba(0,0,0,0.1); 
+                                            /* border-radius:30px; */
+                                            text-align: center;
+                                            display: none;">
+                </div>
+    
+                <!-- Drop Box -->
+                <div class="drop-box" id="dropbox">
+                    <div class="d-flex justify-content-center align-items-center" style="height: 100%;">
+                        <p class="text-box" style="font-size: 24px; color: gray;">
+                            <i class="bi bi-filetype-txt" style="font-size: 5rem;"></i><br>
+                            <i class="fa-solid fa-arrow-pointer fs-6"></i> Click or <i class="fa-solid fa-file-arrow-up fs-6"></i> Drop to Upload File
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <form id="demoForm" data-url="{% url 'demoupload' %}" method="post" enctype="multipart/form-data">
+                {% csrf_token%}
+                <!-- folder select -->
+                <div class="row">
+                    <input type="file" name="files" id="files" style="display: none;" accept=".txt" multiple>
+                    <!-- <div class="col-12 d-flex justify-content-center align-items-center"> -->
+                    <!-- <div class="d-grid gap-3 d-md-flex justify-content-center">
+                        <input type="file" name="files" id="files" style="display: none;" accept=".mp4" multiple>
+                        <label for="files" class="btn btn-outline-primary btn-lg mb-3 me-3">Upload Files</label>
+                        <input type="file" name="folder" id="folder" style="display: none;" webkitdirectory="">
+                        <label for="folder" class="btn btn-outline-primary btn-lg mb-3 ms-3">Upload Folder</label>
+                    </div> -->
+                    <!-- files list -->
+                    <!-- <div id="fileList" class="mb-3 col-12 d-flex justify-content-center align-items-center"></div> -->
+    
+                    <div class="demo-footer d-grid gap-2 mx-auto col-4">
+                        <button id="demoSubmit" type="submit" class="btn btn-primary btn-lg">submit</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+        
+    </div>
+    
+
+{% endblock %}
+
+{% block extra_js %}
+   
+    <script>
+        let dropFiles = [];
+        
+        const dropbox = document.getElementById('dropbox');
+        const filesInput = document.getElementById('files');
+        const fileListContainer = document.getElementById('fileList');
+
+        ['dragenter', 'dragover', 'dragleave', 'dragstart', 'dragend', 'drop'].forEach(eventName => {
+            if (dropbox) {
+                dropbox.addEventListener(eventName, function (e) {
+                    e.preventDefault();  // 必须阻止默认行为
+                });
+            }
+        });
+        // 拖拽文件进入时的样式
+        dropbox.addEventListener('dragover', function () {
+            this.style.background = 'rgba(255,255,255, 1.0)';
+            this.style.border = '3px dashed black';
+            this.style.boxShadow = '3px 3px 5px 7px rgba(0,0,0,0.1)';
+            this.style.borderRadius = "30px";
+            this.innerHTML = `<div class="d-flex justify-content-center align-items-center" style="height: 100%;">
+                                <p style="font-size: 24px; color: gray;">
+                                    <i class="bi bi-file-earmark-arrow-up" style="font-size: 3rem;"></i><br>
+                                    Upload Files & Folder Here
+                                </p>
+                            </div>`;
+        });
+
+        // 拖拽文件离开时的样式
+        dropbox.addEventListener('dragleave', function (e) {
+            e.preventDefault();
+            this.style.background = '';
+            this.style.border = '3px dashed gray';
+            this.style.boxShadow = '0px 0px 0px 0px rgba(0,0,0,0)';
+            this.style.borderRadius = "30px";
+            this.innerHTML = `<div class="d-flex justify-content-center align-items-center" style="height: 100%;">
+                                <p style="font-size: 24px; color: gray;">
+                                    <i class="bi bi-filetype-txt" style="font-size: 3rem;"></i><br>
+                                    Drag & Drop to Upload File
+                                </p>
+                            </div>`;
+        });
+
+        // 文件被放下时处理文件
+        dropbox.addEventListener('drop', function (e) {
+            e.preventDefault();
+
+            const items = e.dataTransfer.items;
+            const promises = [];
+
+            if (items) {
+                // 使用 DataTransferItemList 接口
+                for (let i = 0; i < items.length; i++) {
+                    if (items[i].kind === 'file') {
+                        const entry = items[i].webkitGetAsEntry();
+                        if (entry) {
+                            promises.push(readAllEntries(entry));
+                        }
+                    }
+                }
+
+                Promise.all(promises).then(results => {
+                    const files = results.flat(Infinity);
+                    if (files.length > 0) {
+                        dropFiles = [...dropFiles, ...files];
+                        updateFileList(dropFiles);
+                        this.style.display = 'none';
+                        fileListContainer.style.display = 'block';
+                    } else {
+                        alert('Not Found *.txt Files.');
+                    }
+                });
+            }
+        });
+
+        function initFileInput() {
+            filesInput.addEventListener('change', function(e) {
+                const newFiles = Array.from(this.files).filter(file => 
+                    file.name.toLowerCase().endsWith('.txt') &&
+                    !dropFiles.some(f => f.name === file.name && f.size === file.size) // 去重
+                );
+                
+                if (newFiles.length > 0) {
+                    dropFiles = [...dropFiles, ...newFiles];
+                    updateFileList(dropFiles);
+                    dropbox.style.display = 'none';
+                    fileListContainer.style.display = 'block';
+                }
+                this.value = ''; // 清空输入
+            });
+        }
+
+        // 初始化时调用
+        initFileInput();
+
+        dropbox.addEventListener('click', function () {
+            filesInput.click();
+        });
+
+        function readAllEntries(entry) {
+            return new Promise((resolve) => {
+                if (entry.isFile) {
+                    entry.file(file => {
+                        if (file.name.toLowerCase().endsWith('.txt')) {
+                            resolve([file]);
+                        } else {
+                            resolve([]);
+                        }
+                    });
+                } else if (entry.isDirectory) {
+                    const dirReader = entry.createReader();
+                    const entries = [];
+
+                    const readEntries = () => {
+                        dirReader.readEntries(results => {
+                            if (!results.length) {
+                                // 所有子条目读取完成
+                                const promises = entries.map(readAllEntries);
+                                Promise.all(promises).then(files => {
+                                    resolve(files.flat());
+                                });
+                            } else {
+                                entries.push(...results);
+                                readEntries();
+                            }
+                        });
+                    };
+
+                    readEntries();
+                }
+            });
+        }
+
+        // 创建文件列表表格
+        function createFileListTable(files) {
+            const tableDiv = document.createElement('div');
+            tableDiv.className = 'table-responsive';
+            tableDiv.style.cssText = `max-height: 300px; 
+                                        overflow-y: auto;
+                                        overflow-x: hidden;
+                                        `;
+            const table = document.createElement('table');
+            table.className = 'table table-striped table-primary align-middle';
+            table.style.cssText = `width: 100%;
+                                    justify-self: center;
+                                    align-items: center;
+                                    `;
+            const filesRows = files.map((file, index) => {
+                return `
+                    <tr>
+                        <th scope="row">${index + 1}</th>
+                        <td class="text-primary">
+                            <i class="bi bi-filetype-txt"></i>
+                            ${file.name}
+                            <div class="btn btn-sm border border-danger float-end delete-btn" data-index="${index}">
+                                <i class="bi bi-trash3 text-danger"></i>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="progress">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated"
+                                role="progressbar"
+                                aria-valuenow="0"
+                                aria-valuemin="0"
+                                aria-valuemax="100"
+                                style="width: 0%">0%</div>
+                            </div>
+                        </td>
+                        <td class="text-secondary">${formatBytes(file.size)}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            // TODO: add a button to delete all files. 
+            // TODO: 追加删除所有文件的按钮
+            table.innerHTML = `
+                <thead style="position:sticky; top:0; z-index:500;">
+                    <tr>
+                        <th style="width: 5%">#</th>
+                        <th style="width: 45%">File Name</th>
+                        <th style="width: 35%">Process</th>
+                        <th style="width: 15%">File Size</th>
+                    </tr>
+                </thead>
+                <tbody class="table-group-divider overflow-auto">
+                    ${filesRows}
+                </tbody>
+            `;
+            tableDiv.appendChild(table);
+
+            tableDiv.querySelectorAll('.delete-btn').forEach(btn => {
+                btn.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    const row = this.closest('tr');
+                    row.classList.add('delete-animation');
+                    setTimeout(() => {
+                        const index = parseInt(this.dataset.index);
+                        dropFiles.splice(index, 1);
+                        updateFileList(dropFiles);
+                    }, 500);
+                });
+            });
+            return tableDiv;
+            
+        }
+        // 更新文件列表
+        function updateFileList(files) {
+            fileListContainer.innerHTML = '';
+            fileListContainer.style.maxHeight = '100%';
+
+            if (files.length > 0) {
+                // 已经只包含 .mp4 文件，不再需要检查
+                fileListContainer.appendChild(createFileListTable(files));
+            } else {
+                dropFiles = [];
+                dropbox.style = '';
+                dropbox.style.display = 'block';
+                dropbox.innerHTML = `
+                    <div class="d-flex justify-content-center align-items-center" style="height: 100%;">
+                        <p class="text-box" style="font-size: 24px; color: gray;">
+                            <i class="bi bi-filetype-txt" style="font-size: 5rem;"></i><br>
+                            <i class="fa-solid fa-arrow-pointer fs-6"></i> Click or <i class="fa-solid fa-file-arrow-up fs-6"></i> Drop to Upload File
+                        </p>
+                    </div>
+                `;
+                fileListContainer.style.display = 'none';
+                fileListContainer.innerHTML = '';
+                filesInput.value = '';
+                if(document.getElementById('demoSubmit').disabled) {
+                    document.getElementById('demoSubmit').disabled = false;
+                }
+            }
+        }
+
+        // file size
+        function formatBytes(bytes, decimals = 2) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const dm = decimals < 0 ? 0: decimals;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+        }
+
+
+
+        function readEntry(entry) {
+            if (entry.isFile) {
+                return new Promise(resolve => {
+                    entry.file(file => {
+                        if (file.name.toLowerCase().endsWith('.txt')) {
+                            resolve([file]);
+                        } else {
+                            resolve([]);
+                        }
+                    });
+                });
+            } else if (entry.isDirectory) {
+                let dirReader = entry.createReader();
+                return new Promise(resolve => {
+                    const entries = [];
+                    const readEntries = () => {
+                        dirReader.readEntries(results => {
+                            if (!results.length) {
+                                // 递归处理目录中的所有条目
+                                Promise.all(entries.map(readEntry)).then(files => resolve(files.flat(Infinity)));
+                            } else {
+                                entries.push(...results);
+                                readEntries();
+                            }
+                        });
+                    };
+                    readEntries();
+                });
+            }
+        }
+        
+
+        
+
+        document.getElementById('demoForm').addEventListener('submit',function(e) {
+            e.preventDefault();
+            document.getElementById('demoSubmit').disabled = true;
+            const progressBar = document.querySelector(`.progress-bar`);
+            const icon = document.querySelector(`.bi-filetype-txt`);
+
+            const formData = new FormData();
+            dropFiles.forEach(file => {
+                formData.append('demo', file);
+            });
+            const url = this.getAttribute('data-url');
+            const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrftoken
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log(data);
+                if (data.success) {
+                    progressBar.style.width = 100 + '%';
+                    progressBar.textContent = 100 + '%';
+                    icon.className = "bi bi-check-circle-fill text-success";
+                    progressBar.className = 'progress-bar progress-bar-striped bg-success';
+                    alert('Success');
+
+                    // updateFileList([]);
+                } else {
+                    alert('Failed');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+
+        })
+
+    </script>
+    
+    
+{% endblock %}

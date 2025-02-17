@@ -46,7 +46,7 @@ INSTALLED_APPS = [
     'django.contrib.sites',
     'map',
     "widget_tweaks",
-
+    'sensor',
     # 'user',
     "accounts",
     # 'allauth',

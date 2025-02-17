@@ -8,6 +8,9 @@ urlpatterns = [
     ## .com/main/dashboard/
     path('dashboard/', views.dashboard, name="dashboard"),
     
+    ## .com/main/demo/
+    path('demo/', views.demo, name="demo"),
+    path('demoupload/', views.demoupload, name="demoupload"),
     # video upload
     ## .com/main/videoupload_index/
     path('videoupload_index/', views.videoupload_index, name="videoupload_index"),

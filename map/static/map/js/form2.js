@@ -71,7 +71,7 @@ function createForm(infoDatas=null) {
     const formHTML = `
         ${styles}
 
-        <div class="mt-3">
+        <div class="m-3">
             <form class="border border-2 border-dark rounded-3 p-2 mb-3">
                 <div class="row text-dark text-center g-1 mb-1">
                     <!-- 左侧内容 -->
@@ -133,7 +133,7 @@ function createForm(infoDatas=null) {
                     
                 </div>
             </form>
-            <div id="btn-group" class="d-grid gap-2 d-md-flex justify-content-md-end mb-3">
+            <div id="btn-group" class="d-grid gap-2 d-md-flex justify-content-md-end">
                 <button id="save-btn" type="submit" class="btn btn-primary me-md-2 ">
                     저장
                 </button>
